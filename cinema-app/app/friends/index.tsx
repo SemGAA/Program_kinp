@@ -34,15 +34,11 @@ export default function FriendsScreen() {
     setError(null);
 
     try {
-      const [friendsPayload, requestsPayload] = await Promise.all([
-        getFriends(token),
-        getFriendRequests(token),
-      ]);
+      const [friendsPayload, requestsPayload] = await Promise.all([getFriends(token), getFriendRequests(token)]);
       setFriends(friendsPayload);
       setRequests(requestsPayload);
     } catch (caughtError) {
-      const message =
-        caughtError instanceof ApiError ? caughtError.message : 'Не удалось загрузить друзей.';
+      const message = caughtError instanceof ApiError ? caughtError.message : 'Не удалось загрузить друзей.';
       setError(message);
     } finally {
       setIsLoading(false);
@@ -73,8 +69,7 @@ export default function FriendsScreen() {
       setEmail('');
       await loadData();
     } catch (caughtError) {
-      const message =
-        caughtError instanceof ApiError ? caughtError.message : 'Не удалось отправить заявку.';
+      const message = caughtError instanceof ApiError ? caughtError.message : 'Не удалось отправить заявку.';
       setError(message);
     } finally {
       setIsSubmitting(false);
@@ -95,8 +90,7 @@ export default function FriendsScreen() {
       }
       await loadData();
     } catch (caughtError) {
-      const message =
-        caughtError instanceof ApiError ? caughtError.message : 'Не удалось обновить заявку.';
+      const message = caughtError instanceof ApiError ? caughtError.message : 'Не удалось обновить заявку.';
       Alert.alert('Ошибка', message);
     }
   };
@@ -104,7 +98,7 @@ export default function FriendsScreen() {
   return (
     <AppShell
       title="Друзья"
-      subtitle="Friend request идёт по email. После принятия заявки заметки можно отправлять напрямую другу.">
+      subtitle="Добавляйте друзей по email. После подтверждения можно делиться заметками и смотреть вместе.">
       <View style={[sharedStyles.card, styles.formCard]}>
         <Text style={styles.sectionTitle}>Пригласить по email</Text>
         <TextInput
@@ -182,10 +176,15 @@ export default function FriendsScreen() {
         </View>
       ) : null}
 
-      {!isLoading && !error && friends.length === 0 && requests.incoming.length === 0 && requests.outgoing.length === 0 ? (
+      {!isLoading &&
+      !error &&
+      friends.length === 0 &&
+      requests.incoming.length === 0 &&
+      requests.outgoing.length === 0 ? (
         <View style={sharedStyles.card}>
           <Text style={sharedStyles.emptyText}>
-            Пока нет друзей и активных заявок. Добавьте пользователя по email, чтобы начать обмен заметками.
+            Пока нет друзей и активных заявок. Добавьте пользователя по email, чтобы начать совместные
+            просмотры и обмен заметками.
           </Text>
         </View>
       ) : null}

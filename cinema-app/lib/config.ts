@@ -2,7 +2,7 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 function normalizeApiBaseUrl(value: string): string {
-  return value.replace(/\/$/, '');
+  return value.trim().replace(/\/$/, '');
 }
 
 function extractLanHost(candidate?: string | null): string | null {
@@ -10,10 +10,7 @@ function extractLanHost(candidate?: string | null): string | null {
     return null;
   }
 
-  const normalized = candidate
-    .replace(/^[a-z]+:\/\//i, '')
-    .split(/[/?#]/)[0]
-    ?.trim();
+  const normalized = candidate.replace(/^[a-z]+:\/\//i, '').split(/[/?#]/)[0]?.trim();
 
   if (!normalized) {
     return null;
@@ -55,7 +52,7 @@ function deriveApiBaseUrlFromExpoRuntime(): string | null {
   return null;
 }
 
-const fallbackApiBaseUrl =
+export const FALLBACK_API_BASE_URL =
   deriveApiBaseUrlFromExpoRuntime() ??
   Platform.select({
     android: 'http://10.0.2.2:8000/api',
@@ -66,6 +63,10 @@ const fallbackApiBaseUrl =
 const configuredApiBaseUrl =
   process.env.EXPO_PUBLIC_API_BASE_URL ??
   Constants.expoConfig?.extra?.apiBaseUrl ??
-  fallbackApiBaseUrl;
+  FALLBACK_API_BASE_URL;
 
-export const API_BASE_URL = normalizeApiBaseUrl(String(configuredApiBaseUrl));
+export const DEFAULT_API_BASE_URL = normalizeApiBaseUrl(String(configuredApiBaseUrl));
+
+export function sanitizeApiBaseUrl(value: string) {
+  return normalizeApiBaseUrl(value);
+}

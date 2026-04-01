@@ -35,8 +35,7 @@ export default function SearchScreen() {
       const movies = await searchMovies(query.trim(), token);
       setResults(movies);
     } catch (caughtError) {
-      const message =
-        caughtError instanceof ApiError ? caughtError.message : 'Не удалось выполнить поиск.';
+      const message = caughtError instanceof ApiError ? caughtError.message : 'Не удалось выполнить поиск.';
       setError(message);
       setResults([]);
     } finally {
@@ -47,7 +46,7 @@ export default function SearchScreen() {
   return (
     <AppShell
       title="Поиск"
-      subtitle="Фильмы подгружаются с backend API. Выберите карточку, чтобы сохранить заметку и получить рекомендации.">
+      subtitle="Найдите фильм, откройте карточку и создайте заметку или комнату совместного просмотра.">
       <View style={[sharedStyles.card, styles.searchCard]}>
         <TextInput
           autoCapitalize="none"
@@ -104,7 +103,8 @@ export default function SearchScreen() {
       {!hasSearched ? (
         <View style={sharedStyles.card}>
           <Text style={sharedStyles.emptyText}>
-            Начните с поиска фильма. После открытия карточки можно сохранить собственную заметку и попросить backend подобрать похожие фильмы.
+            Начните с поиска фильма. После открытия карточки можно сохранить заметку и создать комнату
+            просмотра по прямой ссылке на видео.
           </Text>
         </View>
       ) : null}

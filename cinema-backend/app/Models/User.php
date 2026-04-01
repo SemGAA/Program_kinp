@@ -57,4 +57,19 @@ class User extends Authenticatable
     {
         return $this->hasMany(Friendship::class, 'user_two_id');
     }
+
+    public function hostedWatchRooms(): HasMany
+    {
+        return $this->hasMany(WatchRoom::class, 'host_user_id');
+    }
+
+    public function watchRoomMemberships(): HasMany
+    {
+        return $this->hasMany(WatchRoomMember::class);
+    }
+
+    public function watchRoomMessages(): HasMany
+    {
+        return $this->hasMany(WatchRoomMessage::class);
+    }
 }

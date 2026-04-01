@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '@/lib/config';
+import { getApiBaseUrl } from '@/lib/runtime-config';
 import type {
   AuthResponse,
   AuthUser,
@@ -10,6 +10,10 @@ import type {
   MovieRecommendation,
   MovieSearchResult,
   NotesPayload,
+  WatchPlayback,
+  WatchRoom,
+  WatchRoomMessage,
+  WatchRoomSummary,
 } from '@/types/app';
 
 type RequestOptions = {
@@ -80,7 +84,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   let response: Response;
 
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
+    response = await fetch(`${getApiBaseUrl()}${path}`, {
       method: options.method ?? 'GET',
       headers,
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
@@ -250,6 +254,89 @@ export async function rejectFriendRequest(requestId: number, token: string) {
     method: 'POST',
     token,
   });
+}
+
+export async function getWatchRooms(token: string) {
+  const payload = await request<{ data: WatchRoomSummary[] }>('/watch-rooms', { token });
+  return payload.data;
+}
+
+export async function createWatchRoom(
+  payload: {
+    movie_title: string;
+    poster_path?: string | null;
+    release_year?: number | null;
+    tmdb_id?: number | null;
+    video_url: string;
+  },
+  token: string,
+) {
+  const response = await request<{ data: WatchRoom }>('/watch-rooms', {
+    method: 'POST',
+    body: payload,
+    token,
+  });
+
+  return response.data;
+}
+
+export async function joinWatchRoom(code: string, token: string) {
+  const response = await request<{ data: WatchRoom }>('/watch-rooms/join', {
+    method: 'POST',
+    body: { code },
+    token,
+  });
+
+  return response.data;
+}
+
+export async function getWatchRoom(code: string, token: string) {
+  const response = await request<{ data: WatchRoom }>(`/watch-rooms/${encodeURIComponent(code)}`, {
+    token,
+  });
+
+  return response.data;
+}
+
+export async function syncWatchRoomPlayback(
+  code: string,
+  payload: {
+    playback_position_ms: number;
+    playback_rate?: number;
+    playback_state: 'playing' | 'paused' | 'ended';
+  },
+  token: string,
+) {
+  const response = await request<{ data: WatchPlayback }>(
+    `/watch-rooms/${encodeURIComponent(code)}/sync`,
+    {
+      method: 'POST',
+      body: payload,
+      token,
+    },
+  );
+
+  return response.data;
+}
+
+export async function sendWatchRoomMessage(
+  code: string,
+  payload: {
+    body: string;
+    kind?: 'chat' | 'note';
+  },
+  token: string,
+) {
+  const response = await request<{ data: WatchRoomMessage }>(
+    `/watch-rooms/${encodeURIComponent(code)}/messages`,
+    {
+      method: 'POST',
+      body: payload,
+      token,
+    },
+  );
+
+  return response.data;
 }
 
 export { ApiConnectionError, ApiError };

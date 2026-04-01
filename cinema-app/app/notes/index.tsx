@@ -40,8 +40,7 @@ export default function NotesScreen() {
       setNotes(notesPayload);
       setFriends(friendsPayload);
     } catch (caughtError) {
-      const message =
-        caughtError instanceof ApiError ? caughtError.message : 'Не удалось загрузить заметки.';
+      const message = caughtError instanceof ApiError ? caughtError.message : 'Не удалось загрузить заметки.';
       setError(message);
     } finally {
       setIsLoading(false);
@@ -74,9 +73,7 @@ export default function NotesScreen() {
             await loadData();
           } catch (caughtError) {
             const message =
-              caughtError instanceof ApiError
-                ? caughtError.message
-                : 'Не удалось отправить заметку.';
+              caughtError instanceof ApiError ? caughtError.message : 'Не удалось отправить заметку.';
             Alert.alert('Ошибка', message);
           }
         },
@@ -130,7 +127,7 @@ export default function NotesScreen() {
   return (
     <AppShell
       title="Заметки"
-      subtitle="В черновиках хранится ваш личный контекст, а во входящих — заметки друзей с приглашением на просмотр.">
+      subtitle="Черновики — это ваши личные мысли о фильмах, а во входящих лежат заметки друзей и приглашения.">
       <View style={styles.tabsRow}>
         <Pressable
           onPress={() => setActiveTab('own')}
@@ -140,9 +137,7 @@ export default function NotesScreen() {
         <Pressable
           onPress={() => setActiveTab('incoming')}
           style={[styles.tabButton, activeTab === 'incoming' && styles.tabButtonActive]}>
-          <Text style={[styles.tabText, activeTab === 'incoming' && styles.tabTextActive]}>
-            Входящие
-          </Text>
+          <Text style={[styles.tabText, activeTab === 'incoming' && styles.tabTextActive]}>Входящие</Text>
         </Pressable>
       </View>
 

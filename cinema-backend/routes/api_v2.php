@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\FriendshipController;
 use App\Http\Controllers\Api\MovieController;
 use App\Http\Controllers\Api\NoteController;
+use App\Http\Controllers\Api\WatchRoomController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -29,4 +30,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/friend-requests', [FriendshipController::class, 'store']);
     Route::post('/friend-requests/{friendship}/accept', [FriendshipController::class, 'accept']);
     Route::post('/friend-requests/{friendship}/reject', [FriendshipController::class, 'reject']);
+
+    Route::get('/watch-rooms', [WatchRoomController::class, 'index']);
+    Route::post('/watch-rooms', [WatchRoomController::class, 'store']);
+    Route::post('/watch-rooms/join', [WatchRoomController::class, 'join']);
+    Route::get('/watch-rooms/{code}', [WatchRoomController::class, 'show']);
+    Route::post('/watch-rooms/{code}/sync', [WatchRoomController::class, 'sync']);
+    Route::post('/watch-rooms/{code}/messages', [WatchRoomController::class, 'sendMessage']);
 });

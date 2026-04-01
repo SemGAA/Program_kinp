@@ -7,7 +7,9 @@ import 'react-native-reanimated';
 import { LoadingScreen } from '@/components/loading-screen';
 import { AppColors } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
+import { useRuntimeConfig } from '@/hooks/use-runtime-config';
 import { AuthProvider } from '@/providers/auth-provider';
+import { RuntimeConfigProvider } from '@/providers/runtime-config-provider';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -69,12 +71,26 @@ function RootNavigator() {
   );
 }
 
+function ConfiguredApp() {
+  const { isLoading } = useRuntimeConfig();
+
+  if (isLoading) {
+    return <LoadingScreen label="Подключаем конфигурацию сервера..." />;
+  }
+
+  return (
+    <AuthProvider>
+      <RootNavigator />
+    </AuthProvider>
+  );
+}
+
 export default function RootLayout() {
   return (
     <ThemeProvider value={navigationTheme}>
-      <AuthProvider>
-        <RootNavigator />
-      </AuthProvider>
+      <RuntimeConfigProvider>
+        <ConfiguredApp />
+      </RuntimeConfigProvider>
     </ThemeProvider>
   );
 }

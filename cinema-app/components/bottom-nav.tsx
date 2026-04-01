@@ -1,11 +1,11 @@
-import { Compass, House, NotebookPen, Users, type LucideIcon } from 'lucide-react-native';
+import { Compass, House, NotebookPen, PlaySquare, Users, type LucideIcon } from 'lucide-react-native';
 import { usePathname, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppColors } from '@/constants/theme';
 
 type NavItem = {
-  href: '/' | '/search' | '/notes' | '/friends';
+  href: '/' | '/search' | '/watch' | '/notes' | '/friends';
   icon: LucideIcon;
   label: string;
 };
@@ -13,6 +13,7 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { href: '/', icon: House, label: 'Главная' },
   { href: '/search', icon: Compass, label: 'Поиск' },
+  { href: '/watch', icon: PlaySquare, label: 'Комнаты' },
   { href: '/notes', icon: NotebookPen, label: 'Заметки' },
   { href: '/friends', icon: Users, label: 'Друзья' },
 ];
@@ -64,7 +65,7 @@ const styles = StyleSheet.create({
   },
   label: {
     color: AppColors.textSecondary,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
   },
   labelActive: {

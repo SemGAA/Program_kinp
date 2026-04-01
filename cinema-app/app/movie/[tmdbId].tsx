@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   ActivityIndicator,
   Alert,
@@ -17,6 +17,7 @@ import { useAuth } from '@/hooks/use-auth';
 import {
   ApiError,
   createNote,
+  createWatchRoom,
   getMovieDetails,
   getMovieRecommendations,
   getNotes,
@@ -25,11 +26,14 @@ import {
 import { formatRuntime } from '@/lib/format';
 import type { MovieDetails, MovieRecommendation } from '@/types/app';
 
+const DEMO_VIDEO_URL = 'https://vjs.zencdn.net/v/oceans.mp4';
+
 function readParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
 export default function MovieDetailsScreen() {
+  const router = useRouter();
   const { refreshUser, token } = useAuth();
   const params = useLocalSearchParams<{
     fromName?: string;
@@ -48,10 +52,12 @@ export default function MovieDetailsScreen() {
   const [movie, setMovie] = useState<MovieDetails | null>(null);
   const [noteId, setNoteId] = useState<number | null>(initialNoteId);
   const [noteText, setNoteText] = useState(initialOwnNote ?? '');
+  const [videoUrl, setVideoUrl] = useState('');
   const [recommendations, setRecommendations] = useState<MovieRecommendation[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
 
   useEffect(() => {
@@ -66,10 +72,7 @@ export default function MovieDetailsScreen() {
       setError(null);
 
       try {
-        const [moviePayload, notesPayload] = await Promise.all([
-          getMovieDetails(tmdbId, token),
-          getNotes(token),
-        ]);
+        const [moviePayload, notesPayload] = await Promise.all([getMovieDetails(tmdbId, token), getNotes(token)]);
 
         const existingOwnNote =
           notesPayload.own.find((note) => note.id === initialNoteId) ??
@@ -84,8 +87,7 @@ export default function MovieDetailsScreen() {
           setNoteText(initialOwnNote);
         }
       } catch (caughtError) {
-        const message =
-          caughtError instanceof ApiError ? caughtError.message : 'Не удалось загрузить фильм.';
+        const message = caughtError instanceof ApiError ? caughtError.message : 'Не удалось загрузить фильм.';
         setError(message);
       } finally {
         setIsLoading(false);
@@ -101,7 +103,7 @@ export default function MovieDetailsScreen() {
     }
 
     if (!noteText.trim()) {
-      Alert.alert('Пустая заметка', 'Добавьте несколько слов о фильме перед сохранением.');
+      Alert.alert('Пустая заметка', 'Добавьте пару строк о фильме перед сохранением.');
       return;
     }
 
@@ -149,12 +151,44 @@ export default function MovieDetailsScreen() {
       setRecommendations(recommendationsPayload);
     } catch (caughtError) {
       const message =
-        caughtError instanceof ApiError
-          ? caughtError.message
-          : 'Не удалось загрузить рекомендации.';
+        caughtError instanceof ApiError ? caughtError.message : 'Не удалось загрузить рекомендации.';
       setError(message);
     } finally {
       setIsLoadingRecommendations(false);
+    }
+  };
+
+  const handleCreateRoom = async () => {
+    if (!token || !movie) {
+      return;
+    }
+
+    if (!videoUrl.trim()) {
+      Alert.alert('Нужна ссылка', 'Вставьте прямую ссылку на видео формата mp4 или m3u8.');
+      return;
+    }
+
+    setIsCreatingRoom(true);
+    setError(null);
+
+    try {
+      const room = await createWatchRoom(
+        {
+          movie_title: movie.title,
+          poster_path: movie.posterPath,
+          release_year: movie.releaseYear,
+          tmdb_id: movie.id,
+          video_url: videoUrl.trim(),
+        },
+        token,
+      );
+
+      router.push(`/watch/${room.code}`);
+    } catch (caughtError) {
+      const message = caughtError instanceof ApiError ? caughtError.message : 'Не удалось создать комнату.';
+      setError(message);
+    } finally {
+      setIsCreatingRoom(false);
     }
   };
 
@@ -175,7 +209,7 @@ export default function MovieDetailsScreen() {
   return (
     <AppShell
       title={movie?.title ?? 'Карточка фильма'}
-      subtitle="Карточка фильма без realtime-функций. Здесь хранятся заметки и рекомендации.">
+      subtitle="Сохраняйте заметку, подбирайте рекомендации и открывайте комнату совместного просмотра.">
       {isLoading ? (
         <View style={sharedStyles.card}>
           <ActivityIndicator color={AppColors.accent} />
@@ -228,7 +262,7 @@ export default function MovieDetailsScreen() {
               multiline
               numberOfLines={6}
               onChangeText={setNoteText}
-              placeholder="Напишите, кому и почему вы бы посоветовали этот фильм."
+              placeholder="Напишите, почему этот фильм стоит посмотреть и что в нём цепляет."
               placeholderTextColor={AppColors.textSecondary}
               style={[sharedStyles.input, styles.textArea]}
               textAlignVertical="top"
@@ -252,7 +286,40 @@ export default function MovieDetailsScreen() {
                 {isLoadingRecommendations ? (
                   <ActivityIndicator color={AppColors.textPrimary} />
                 ) : (
-                  <Text style={sharedStyles.secondaryButtonText}>Подобрать похожие</Text>
+                  <Text style={sharedStyles.secondaryButtonText}>Похожие фильмы</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+
+          <View style={[sharedStyles.card, styles.roomCard]}>
+            <Text style={styles.sectionTitle}>Комната совместного просмотра</Text>
+            <Text style={sharedStyles.helperText}>
+              Вставьте прямую ссылку на видео. Для быстрого теста можно подставить демо-видео.
+            </Text>
+            <TextInput
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+              onChangeText={setVideoUrl}
+              placeholder="https://example.com/video.mp4"
+              placeholderTextColor={AppColors.textSecondary}
+              style={sharedStyles.input}
+              value={videoUrl}
+            />
+            <View style={styles.actionRow}>
+              <Pressable
+                onPress={() => setVideoUrl(DEMO_VIDEO_URL)}
+                style={[sharedStyles.secondaryButton, styles.flexButton]}>
+                <Text style={sharedStyles.secondaryButtonText}>Подставить демо</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => void handleCreateRoom()}
+                style={[sharedStyles.primaryButton, styles.flexButton]}>
+                {isCreatingRoom ? (
+                  <ActivityIndicator color={AppColors.textPrimary} />
+                ) : (
+                  <Text style={sharedStyles.primaryButtonText}>Создать комнату</Text>
                 )}
               </Pressable>
             </View>
@@ -335,6 +402,9 @@ const styles = StyleSheet.create({
     color: AppColors.textPrimary,
     fontSize: 18,
     fontWeight: '700',
+  },
+  roomCard: {
+    gap: 12,
   },
   sectionTitle: {
     color: AppColors.textPrimary,

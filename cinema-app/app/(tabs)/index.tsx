@@ -11,12 +11,12 @@ export default function HomeScreen() {
 
   return (
     <AppShell
-      title="Кино-заметки"
-      subtitle="Личный каталог фильмов, заметок и приглашений на просмотр.">
+      title="Cinema Notes"
+      subtitle="Поиск фильмов, совместный просмотр по комнате и заметки прямо во время сеанса.">
       <View style={[sharedStyles.card, styles.heroCard]}>
         <View style={styles.heroHeader}>
           <View style={styles.heroCopy}>
-            <Text style={styles.eyebrow}>Панель MVP</Text>
+            <Text style={styles.eyebrow}>MVP</Text>
             <Text style={styles.heroTitle}>{user ? `Привет, ${user.name}` : 'Привет'}</Text>
           </View>
           <Pressable onPress={() => router.push('/profile')} style={styles.profileButton}>
@@ -24,7 +24,8 @@ export default function HomeScreen() {
           </Pressable>
         </View>
         <Text style={sharedStyles.helperText}>
-          Найдите фильм, сохраните заметку и при необходимости отправьте её другу прямо из приложения.
+          Найдите фильм в каталоге, откройте карточку, создайте комнату просмотра и отправьте другу код
+          комнаты. Для синхронного просмотра нужен прямой видео-URL, например mp4 или m3u8.
         </Text>
       </View>
 
@@ -41,21 +42,27 @@ export default function HomeScreen() {
 
       <View style={styles.actionGrid}>
         <Pressable onPress={() => router.push('/search')} style={[sharedStyles.card, styles.actionCard]}>
-          <Text style={styles.actionTitle}>Поиск фильмов</Text>
+          <Text style={styles.actionTitle}>Найти фильм</Text>
           <Text style={sharedStyles.helperText}>
-            Ищите по TMDB и открывайте карточку фильма для заметки.
+            Поиск по TMDB, заметки по фильму и создание комнаты просмотра из карточки.
+          </Text>
+        </Pressable>
+        <Pressable onPress={() => router.push('/watch')} style={[sharedStyles.card, styles.actionCard]}>
+          <Text style={styles.actionTitle}>Комнаты просмотра</Text>
+          <Text style={sharedStyles.helperText}>
+            Войти по коду, открыть уже созданную комнату или быстро поднять демо-комнату для проверки.
           </Text>
         </Pressable>
         <Pressable onPress={() => router.push('/notes')} style={[sharedStyles.card, styles.actionCard]}>
           <Text style={styles.actionTitle}>Мои заметки</Text>
           <Text style={sharedStyles.helperText}>
-            Просматривайте сохранённые и входящие заметки, принимайте приглашения.
+            Сохраняйте впечатления о фильмах и делитесь ими с друзьями в приложении.
           </Text>
         </Pressable>
         <Pressable onPress={() => router.push('/friends')} style={[sharedStyles.card, styles.actionCard]}>
           <Text style={styles.actionTitle}>Друзья</Text>
           <Text style={sharedStyles.helperText}>
-            Добавляйте друзей по email и управляйте входящими заявками.
+            Добавляйте друзей по email и используйте их для совместных просмотров и обмена заметками.
           </Text>
         </Pressable>
       </View>

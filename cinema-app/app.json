@@ -3,7 +3,7 @@
     "name": "cinema-app",
     "slug": "cinema-app",
     "owner": "semga",
-    "version": "1.0.2",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "cinemaapp",
@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "com.semga.cinemanotes",
-      "versionCode": 3,
+      "versionCode": 4,
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",

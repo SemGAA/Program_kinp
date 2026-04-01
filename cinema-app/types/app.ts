@@ -82,3 +82,38 @@ export type AuthResponse = {
   user: AuthUser;
 };
 
+export type WatchPlayback = {
+  lastSyncedAt: string | null;
+  lastSyncedByUserId: number | null;
+  positionMs: number;
+  rate: number;
+  state: 'playing' | 'paused' | 'ended';
+};
+
+export type WatchRoomMessage = {
+  id: number;
+  kind: 'chat' | 'note';
+  body: string;
+  createdAt: string | null;
+  user: PersonPreview | null;
+};
+
+export type WatchRoomSummary = {
+  code: string;
+  host: PersonPreview | null;
+  isHost: boolean;
+  memberCount: number;
+  movieTitle: string;
+  playback: WatchPlayback;
+  posterPath: string | null;
+  posterUrl: string | null;
+  releaseYear: number | null;
+  updatedAt: string | null;
+};
+
+export type WatchRoom = WatchRoomSummary & {
+  members: Array<PersonPreview & { lastSeenAt: string | null }>;
+  messages: WatchRoomMessage[];
+  tmdbId: number | null;
+  videoUrl: string;
+};

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -13,8 +14,8 @@ import {
 
 import { AppColors } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
+import { useRuntimeConfig } from '@/hooks/use-runtime-config';
 import { ApiConnectionError, ApiError } from '@/lib/api';
-import { API_BASE_URL } from '@/lib/config';
 
 type Mode = 'login' | 'register';
 
@@ -25,12 +26,19 @@ type DemoAccount = {
 
 export default function AuthScreen() {
   const { signIn, signUp } = useAuth();
+  const { apiBaseUrl, defaultApiBaseUrl, resetApiUrl, setApiUrl } = useRuntimeConfig();
   const [mode, setMode] = useState<Mode>('login');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [apiUrlDraft, setApiUrlDraft] = useState(apiBaseUrl);
   const [error, setError] = useState<string | null>(null);
+  const [isSavingApiUrl, setIsSavingApiUrl] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    setApiUrlDraft(apiBaseUrl);
+  }, [apiBaseUrl]);
 
   const handleSubmit = async () => {
     if (!email.trim() || !password.trim() || (mode === 'register' && !name.trim())) {
@@ -51,7 +59,7 @@ export default function AuthScreen() {
       let message = 'Не удалось выполнить запрос.';
 
       if (caughtError instanceof ApiConnectionError) {
-        message = `Нет подключения к серверу (${API_BASE_URL}). Проверьте, что backend доступен и адрес API указан правильно.`;
+        message = `Нет подключения к серверу (${apiBaseUrl}). Проверьте адрес API и доступность backend.`;
       } else if (caughtError instanceof ApiError) {
         message = caughtError.message;
       }
@@ -59,6 +67,39 @@ export default function AuthScreen() {
       setError(message);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleSaveApiUrl = async () => {
+    if (!apiUrlDraft.trim()) {
+      setError('Укажите адрес backend API.');
+      return;
+    }
+
+    setIsSavingApiUrl(true);
+    setError(null);
+
+    try {
+      await setApiUrl(apiUrlDraft);
+      Alert.alert('Сервер обновлён', 'Новый адрес backend сохранён в приложении.');
+    } catch {
+      setError('Не удалось сохранить адрес сервера.');
+    } finally {
+      setIsSavingApiUrl(false);
+    }
+  };
+
+  const handleResetApiUrl = async () => {
+    setIsSavingApiUrl(true);
+    setError(null);
+
+    try {
+      await resetApiUrl();
+      Alert.alert('Сервер сброшен', `Вернули адрес по умолчанию: ${defaultApiBaseUrl}`);
+    } catch {
+      setError('Не удалось сбросить адрес сервера.');
+    } finally {
+      setIsSavingApiUrl(false);
     }
   };
 
@@ -77,10 +118,41 @@ export default function AuthScreen() {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.hero}>
           <Text style={styles.eyebrow}>Cinema Notes</Text>
-          <Text style={styles.title}>Вход в MVP</Text>
+          <Text style={styles.title}>Вход и совместный просмотр</Text>
           <Text style={styles.subtitle}>
-            Регистрация и авторизация работают через backend API на Laravel Sanctum.
+            Приложение хранит заметки, комнаты совместного просмотра и синхронизацию через backend API.
           </Text>
+        </View>
+
+        <View style={styles.serverCard}>
+          <Text style={styles.serverTitle}>Адрес сервера</Text>
+          <Text style={styles.serverHint}>Сейчас используется: {apiBaseUrl}</Text>
+          <TextInput
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+            onChangeText={setApiUrlDraft}
+            placeholder="https://your-public-backend.example/api"
+            placeholderTextColor={AppColors.textSecondary}
+            style={styles.input}
+            value={apiUrlDraft}
+          />
+          <View style={styles.serverButtonRow}>
+            <Pressable
+              onPress={() => void handleSaveApiUrl()}
+              style={[styles.secondaryButton, styles.flexButton]}>
+              {isSavingApiUrl ? (
+                <ActivityIndicator color={AppColors.textPrimary} />
+              ) : (
+                <Text style={styles.secondaryButtonText}>Сохранить адрес</Text>
+              )}
+            </Pressable>
+            <Pressable
+              onPress={() => void handleResetApiUrl()}
+              style={[styles.ghostButton, styles.flexButton]}>
+              <Text style={styles.ghostButtonText}>Сбросить</Text>
+            </Pressable>
+          </View>
         </View>
 
         <View style={styles.switchRow}>
@@ -99,7 +171,7 @@ export default function AuthScreen() {
         </View>
 
         <View style={styles.demoCard}>
-          <Text style={styles.demoTitle}>Быстрый локальный вход</Text>
+          <Text style={styles.demoTitle}>Быстрый вход для теста</Text>
           <Text style={styles.subtitle}>
             После `php artisan migrate:fresh --seed` доступны два тестовых аккаунта.
           </Text>
@@ -231,6 +303,22 @@ const styles = StyleSheet.create({
     letterSpacing: 1.1,
     textTransform: 'uppercase',
   },
+  flexButton: {
+    flex: 1,
+  },
+  ghostButton: {
+    alignItems: 'center',
+    borderColor: AppColors.border,
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+  },
+  ghostButtonText: {
+    color: AppColors.textSecondary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
   hero: {
     gap: 10,
   },
@@ -247,6 +335,42 @@ const styles = StyleSheet.create({
   screen: {
     backgroundColor: AppColors.background,
     flex: 1,
+  },
+  secondaryButton: {
+    alignItems: 'center',
+    backgroundColor: AppColors.cardMuted,
+    borderColor: AppColors.border,
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+  },
+  secondaryButtonText: {
+    color: AppColors.textPrimary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  serverButtonRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  serverCard: {
+    backgroundColor: AppColors.card,
+    borderColor: AppColors.border,
+    borderRadius: 24,
+    borderWidth: 1,
+    gap: 12,
+    padding: 18,
+  },
+  serverHint: {
+    color: AppColors.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  serverTitle: {
+    color: AppColors.textPrimary,
+    fontSize: 18,
+    fontWeight: '700',
   },
   submitButton: {
     alignItems: 'center',
