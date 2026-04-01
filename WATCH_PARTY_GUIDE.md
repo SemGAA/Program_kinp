@@ -15,13 +15,19 @@
 ```powershell
 cd D:\Main\Programing\Program_kinp\cinema-backend
 php artisan migrate:fresh --seed
-.\start-public-backend.cmd
+.\watch-party-online.cmd
 ```
 
 Скрипт:
-- поднимет Laravel backend;
-- откроет публичный Cloudflare Tunnel URL;
-- покажет `API URL` вида `https://...trycloudflare.com/api`.
+- поднимет Laravel backend в отдельном окне;
+- откроет публичный Cloudflare Tunnel URL в текущем окне;
+- покажет адрес вида `https://...trycloudflare.com`.
+
+В приложение нужно вставлять:
+
+```text
+https://...trycloudflare.com/api
+```
 
 Важно: пока вы смотрите фильм, окно backend и tunnel закрывать нельзя.
 
