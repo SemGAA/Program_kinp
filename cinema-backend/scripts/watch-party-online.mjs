@@ -105,7 +105,7 @@ function runGit(args, allowFailure = false) {
 async function publishBootstrap(apiBaseUrl) {
   const payload = {
     apiBaseUrl,
-    source: 'serveo',
+    source: 'public-tunnel',
     updatedAt: new Date().toISOString(),
   };
 
@@ -163,26 +163,14 @@ function wireTunnelOutput(stream, onLine) {
   });
 }
 
-function startServeoTunnel() {
+function startTunnel(provider) {
+  const providerName = provider.name;
+
   return new Promise((resolve, reject) => {
-    const child = spawn(
-      'ssh',
-      [
-        '-o',
-        'StrictHostKeyChecking=no',
-        '-o',
-        'ExitOnForwardFailure=yes',
-        '-o',
-        'ServerAliveInterval=30',
-        '-R',
-        '80:localhost:8000',
-        'serveo.net',
-      ],
-      {
-        cwd: backendRoot,
-        stdio: ['inherit', 'pipe', 'pipe'],
-      },
-    );
+    const child = spawn('ssh', provider.args, {
+      cwd: backendRoot,
+      stdio: ['inherit', 'pipe', 'pipe'],
+    });
 
     tunnelProcess = child;
     let resolved = false;
@@ -194,7 +182,11 @@ function startServeoTunnel() {
         return;
       }
 
-      const urlMatch = line.match(/https:\/\/[^\s]+\.serveousercontent\.com/);
+      if (provider.lineHint && !line.includes(provider.lineHint)) {
+        return;
+      }
+
+      const urlMatch = line.match(provider.urlPattern);
       if (!urlMatch) {
         return;
       }
@@ -231,15 +223,75 @@ function startServeoTunnel() {
     child.once('error', reject);
     child.once('close', (code) => {
       if (!resolved) {
-        reject(new Error(`Serveo tunnel exited with code ${code ?? 0}.`));
+        reject(new Error(`${providerName} tunnel exited with code ${code ?? 0}.`));
         return;
       }
 
       console.log('');
-      console.log('Serveo tunnel has stopped.');
+      console.log(`${providerName} tunnel has stopped.`);
       process.exit(code ?? 0);
     });
   });
+}
+
+const TUNNEL_PROVIDERS = [
+  {
+    name: 'localhost.run',
+    args: [
+      '-N',
+      '-T',
+      '-o',
+      'StrictHostKeyChecking=no',
+      '-o',
+      'ExitOnForwardFailure=yes',
+      '-o',
+      'ServerAliveInterval=30',
+      '-R',
+      '80:localhost:8000',
+      'nokey@localhost.run',
+    ],
+    lineHint: 'tunneled with tls termination',
+    urlPattern: /https:\/\/[^\s]+\.(?:lhr\.life|localhost\.run)/,
+  },
+  {
+    name: 'serveo',
+    args: [
+      '-N',
+      '-T',
+      '-o',
+      'StrictHostKeyChecking=no',
+      '-o',
+      'ExitOnForwardFailure=yes',
+      '-o',
+      'ServerAliveInterval=30',
+      '-R',
+      '80:localhost:8000',
+      'serveo.net',
+    ],
+    lineHint: 'Forwarding HTTP traffic from',
+    urlPattern: /https:\/\/[^\s]+\.serveousercontent\.com/,
+  },
+];
+
+async function startPublicTunnel() {
+  let lastError = null;
+
+  for (const provider of TUNNEL_PROVIDERS) {
+    console.log('');
+    console.log(`Starting public ${provider.name} tunnel...`);
+    console.log('');
+
+    try {
+      await startTunnel(provider);
+      return;
+    } catch (error) {
+      lastError = error;
+      console.warn(error instanceof Error ? error.message : String(error));
+      console.warn(`Unable to keep ${provider.name} tunnel alive, trying the next option...`);
+    }
+  }
+
+  throw lastError ?? new Error('Unable to start any public tunnel.');
 }
 
 async function main() {
@@ -253,11 +305,7 @@ async function main() {
   console.log(`Waiting for backend on ${backendHealthUrl} ...`);
   await waitForBackend();
 
-  console.log('');
-  console.log('Starting public Serveo tunnel...');
-  console.log('');
-
-  await startServeoTunnel();
+  await startPublicTunnel();
 }
 
 process.on('SIGINT', () => {
