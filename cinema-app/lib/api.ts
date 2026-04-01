@@ -1,4 +1,4 @@
-import { getApiBaseUrl } from '@/lib/runtime-config';
+import { getApiBaseUrl, refreshApiBaseUrl } from '@/lib/runtime-config';
 import type {
   AuthResponse,
   AuthUser,
@@ -81,15 +81,39 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     headers.Authorization = `Bearer ${options.token}`;
   }
 
-  let response: Response;
-
-  try {
-    response = await fetch(`${getApiBaseUrl()}${path}`, {
+  const executeFetch = (baseUrl: string) =>
+    fetch(`${baseUrl}${path}`, {
       method: options.method ?? 'GET',
       headers,
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     });
+
+  const initialBaseUrl = getApiBaseUrl();
+  let response: Response | null = null;
+
+  try {
+    response = await executeFetch(initialBaseUrl);
   } catch {
+    response = null;
+  }
+
+  if (!response || response.status >= 500) {
+    const refreshedBaseUrl = await refreshApiBaseUrl();
+
+    if (refreshedBaseUrl !== initialBaseUrl) {
+      try {
+        response = await executeFetch(refreshedBaseUrl);
+      } catch {
+        if (!response) {
+          throw new ApiConnectionError(
+            'Не удалось подключиться к backend API. Проверьте адрес сервера и доступность сети.',
+          );
+        }
+      }
+    }
+  }
+
+  if (!response) {
     throw new ApiConnectionError(
       'Не удалось подключиться к backend API. Проверьте адрес сервера и доступность сети.',
     );

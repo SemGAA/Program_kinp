@@ -79,7 +79,7 @@ class NoteController extends Controller
 
         if ($movieNote->user_id !== $user->id) {
             return response()->json([
-                'message' => 'You cannot edit another user\'s note.',
+                'message' => 'Нельзя редактировать чужую заметку.',
             ], 403);
         }
 
@@ -105,7 +105,7 @@ class NoteController extends Controller
 
         if ($movieNote->user_id !== $user->id) {
             return response()->json([
-                'message' => 'You cannot share another user\'s note.',
+                'message' => 'Нельзя отправить чужую заметку.',
             ], 403);
         }
 
@@ -115,13 +115,13 @@ class NoteController extends Controller
 
         if ((int) $validated['recipient_id'] === $user->id) {
             return response()->json([
-                'message' => 'You cannot share a note with yourself.',
+                'message' => 'Нельзя отправить заметку самому себе.',
             ], 422);
         }
 
         if (! $this->usersAreFriends($user->id, (int) $validated['recipient_id'])) {
             return response()->json([
-                'message' => 'Notes can only be shared with friends.',
+                'message' => 'Заметки можно отправлять только друзьям.',
             ], 422);
         }
 
@@ -145,7 +145,7 @@ class NoteController extends Controller
 
         if ($movieNote->sent_to !== $user->id || $movieNote->status !== 'sent') {
             return response()->json([
-                'message' => 'This note cannot be accepted.',
+                'message' => 'Эту заметку нельзя принять.',
             ], 403);
         }
 
@@ -167,7 +167,7 @@ class NoteController extends Controller
 
         if ($movieNote->sent_to !== $user->id || $movieNote->status !== 'sent') {
             return response()->json([
-                'message' => 'This note cannot be rejected.',
+                'message' => 'Эту заметку нельзя отклонить.',
             ], 403);
         }
 

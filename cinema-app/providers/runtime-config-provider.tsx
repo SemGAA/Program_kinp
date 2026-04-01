@@ -9,12 +9,18 @@ import {
 } from 'react';
 
 import { DEFAULT_API_BASE_URL } from '@/lib/config';
-import { bootstrapApiBaseUrl, persistApiBaseUrl, resetApiBaseUrl } from '@/lib/runtime-config';
+import {
+  bootstrapApiBaseUrl,
+  persistApiBaseUrl,
+  refreshApiBaseUrl,
+  resetApiBaseUrl,
+} from '@/lib/runtime-config';
 
 type RuntimeConfigContextValue = {
   apiBaseUrl: string;
   defaultApiBaseUrl: string;
   isLoading: boolean;
+  refreshApiUrl: () => Promise<string>;
   resetApiUrl: () => Promise<void>;
   setApiUrl: (value: string) => Promise<void>;
 };
@@ -48,15 +54,23 @@ export function RuntimeConfigProvider({ children }: PropsWithChildren) {
     setApiBaseUrl(nextValue);
   }, []);
 
+  const handleRefreshApiUrl = useCallback(async () => {
+    const nextValue = await refreshApiBaseUrl();
+    setApiBaseUrl(nextValue);
+
+    return nextValue;
+  }, []);
+
   const value = useMemo<RuntimeConfigContextValue>(
     () => ({
       apiBaseUrl,
       defaultApiBaseUrl: DEFAULT_API_BASE_URL,
       isLoading,
+      refreshApiUrl: handleRefreshApiUrl,
       resetApiUrl: handleResetApiUrl,
       setApiUrl: handleSetApiUrl,
     }),
-    [apiBaseUrl, handleResetApiUrl, handleSetApiUrl, isLoading],
+    [apiBaseUrl, handleRefreshApiUrl, handleResetApiUrl, handleSetApiUrl, isLoading],
   );
 
   return <RuntimeConfigContext.Provider value={value}>{children}</RuntimeConfigContext.Provider>;

@@ -22,12 +22,6 @@ class MovieController extends Controller
             'q' => ['required', 'string', 'min:2', 'max:100'],
         ]);
 
-        if (! $this->tmdbService->configured()) {
-            return response()->json([
-                'message' => 'TMDB API key is not configured.',
-            ], 503);
-        }
-
         return response()->json([
             'data' => $this->tmdbService->searchMovies($validated['q']),
         ]);
@@ -35,12 +29,6 @@ class MovieController extends Controller
 
     public function show(int $tmdbId): JsonResponse
     {
-        if (! $this->tmdbService->configured()) {
-            return response()->json([
-                'message' => 'TMDB API key is not configured.',
-            ], 503);
-        }
-
         return response()->json([
             'data' => $this->tmdbService->getMovie($tmdbId),
         ]);
@@ -48,12 +36,6 @@ class MovieController extends Controller
 
     public function recommendations(Request $request, int $tmdbId): JsonResponse
     {
-        if (! $this->tmdbService->configured()) {
-            return response()->json([
-                'message' => 'TMDB API key is not configured.',
-            ], 503);
-        }
-
         $validated = $request->validate([
             'note' => ['nullable', 'string', 'max:2000'],
         ]);

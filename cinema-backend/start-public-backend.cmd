@@ -1,2 +1,3 @@
 @echo off
-powershell -ExecutionPolicy Bypass -File "%~dp0tunnel-backend.ps1" %*
+cd /d "%~dp0"
+call "%~dp0watch-party-online.cmd"

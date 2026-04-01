@@ -44,6 +44,7 @@ export default function WatchRoomScreen() {
   const [messageBody, setMessageBody] = useState('');
   const [messageKind, setMessageKind] = useState<'chat' | 'note'>('chat');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [isOpeningFullscreen, setIsOpeningFullscreen] = useState(false);
 
   const loadRoom = useCallback(async () => {
     if (!token || !code) {
@@ -215,6 +216,22 @@ export default function WatchRoomScreen() {
     });
   };
 
+  const handleOpenFullscreen = async () => {
+    if (!videoRef.current) {
+      return;
+    }
+
+    setIsOpeningFullscreen(true);
+
+    try {
+      await videoRef.current.presentFullscreenPlayer();
+    } catch {
+      setError('Не удалось открыть видео на весь экран.');
+    } finally {
+      setIsOpeningFullscreen(false);
+    }
+  };
+
   const sortedMessages = useMemo(() => room?.messages ?? [], [room?.messages]);
 
   return (
@@ -258,6 +275,15 @@ export default function WatchRoomScreen() {
               useNativeControls={room.isHost}
               onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
             />
+            <View style={styles.videoActionRow}>
+              <Pressable onPress={() => void handleOpenFullscreen()} style={sharedStyles.secondaryButton}>
+                {isOpeningFullscreen ? (
+                  <ActivityIndicator color={AppColors.textPrimary} />
+                ) : (
+                  <Text style={sharedStyles.secondaryButtonText}>На весь экран</Text>
+                )}
+              </Pressable>
+            </View>
             <Text style={sharedStyles.helperText}>
               {room.isHost
                 ? 'Вы хозяин комнаты: используйте стандартные кнопки плеера для play/pause/seek.'
@@ -475,5 +501,8 @@ const styles = StyleSheet.create({
     height: 220,
     overflow: 'hidden',
     width: '100%',
+  },
+  videoActionRow: {
+    alignItems: 'flex-start',
   },
 });

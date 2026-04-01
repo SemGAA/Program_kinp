@@ -26,19 +26,34 @@ type DemoAccount = {
 
 export default function AuthScreen() {
   const { signIn, signUp } = useAuth();
-  const { apiBaseUrl, defaultApiBaseUrl, resetApiUrl, setApiUrl } = useRuntimeConfig();
+  const { apiBaseUrl, defaultApiBaseUrl, refreshApiUrl, resetApiUrl, setApiUrl } = useRuntimeConfig();
   const [mode, setMode] = useState<Mode>('login');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [apiUrlDraft, setApiUrlDraft] = useState(apiBaseUrl);
   const [error, setError] = useState<string | null>(null);
+  const [isRefreshingApiUrl, setIsRefreshingApiUrl] = useState(false);
   const [isSavingApiUrl, setIsSavingApiUrl] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     setApiUrlDraft(apiBaseUrl);
   }, [apiBaseUrl]);
+
+  useEffect(() => {
+    const syncApiUrl = async () => {
+      setIsRefreshingApiUrl(true);
+
+      try {
+        await refreshApiUrl();
+      } finally {
+        setIsRefreshingApiUrl(false);
+      }
+    };
+
+    void syncApiUrl();
+  }, [refreshApiUrl]);
 
   const handleSubmit = async () => {
     if (!email.trim() || !password.trim() || (mode === 'register' && !name.trim())) {
@@ -103,6 +118,20 @@ export default function AuthScreen() {
     }
   };
 
+  const handleRefreshApiUrl = async () => {
+    setIsRefreshingApiUrl(true);
+    setError(null);
+
+    try {
+      const nextValue = await refreshApiUrl();
+      Alert.alert('Сервер обновлён', `Приложение использует адрес: ${nextValue}`);
+    } catch {
+      setError('Не удалось автоматически обновить адрес сервера.');
+    } finally {
+      setIsRefreshingApiUrl(false);
+    }
+  };
+
   const applyDemoAccount = (account: DemoAccount) => {
     setMode('login');
     setName('');
@@ -125,8 +154,12 @@ export default function AuthScreen() {
         </View>
 
         <View style={styles.serverCard}>
-          <Text style={styles.serverTitle}>Адрес сервера</Text>
-          <Text style={styles.serverHint}>Сейчас используется: {apiBaseUrl}</Text>
+          <Text style={styles.serverTitle}>Подключение к серверу</Text>
+          <Text style={styles.serverHint}>
+            Активный адрес подхватывается автоматически. Ручной ввод нужен только если хотите
+            переопределить сервер вручную.
+          </Text>
+          <Text style={styles.serverValue}>Сейчас используется: {apiBaseUrl}</Text>
           <TextInput
             autoCapitalize="none"
             autoCorrect={false}
@@ -137,6 +170,17 @@ export default function AuthScreen() {
             style={styles.input}
             value={apiUrlDraft}
           />
+          <View style={styles.serverButtonRow}>
+            <Pressable
+              onPress={() => void handleRefreshApiUrl()}
+              style={[styles.secondaryButton, styles.flexButton]}>
+              {isRefreshingApiUrl ? (
+                <ActivityIndicator color={AppColors.textPrimary} />
+              ) : (
+                <Text style={styles.secondaryButtonText}>Обновить автоматически</Text>
+              )}
+            </Pressable>
+          </View>
           <View style={styles.serverButtonRow}>
             <Pressable
               onPress={() => void handleSaveApiUrl()}
@@ -366,6 +410,11 @@ const styles = StyleSheet.create({
     color: AppColors.textSecondary,
     fontSize: 14,
     lineHeight: 20,
+  },
+  serverValue: {
+    color: AppColors.textPrimary,
+    fontSize: 13,
+    lineHeight: 18,
   },
   serverTitle: {
     color: AppColors.textPrimary,

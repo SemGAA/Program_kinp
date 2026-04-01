@@ -1,57 +1,39 @@
 param(
-    [switch]$Inline,
-    [string]$BindHost = "0.0.0.0",
-    [int]$Port = 8000
+    [switch]$Inline
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = 'Stop'
+$projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$command = "Set-Location '$projectRoot'; php -S 0.0.0.0:8000 -t public public/index.php"
 
-$projectRoot = $PSScriptRoot
-$publicRoot = Join-Path $projectRoot "public"
-$routerPath = Join-Path $env:TEMP "cinema-backend-router.php"
-$projectRootForPhp = $projectRoot -replace "\\", "/"
-
-$routerContent = @"
-<?php
-
-use Illuminate\Foundation\Application;
-use Illuminate\Http\Request;
-
-\$projectRoot = '$projectRootForPhp';
-\$documentRoot = \$projectRoot . '/public';
-\$uri = urldecode(parse_url(\$_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/');
-
-if (\$uri !== '/' && file_exists(\$documentRoot.\$uri)) {
-    return false;
+if ($Inline) {
+    Write-Host "Starting Cinema backend on http://0.0.0.0:8000"
+    Set-Location $projectRoot
+    & php -S 0.0.0.0:8000 -t public public/index.php
+    exit $LASTEXITCODE
 }
 
-define('LARAVEL_START', microtime(true));
+Write-Host "Starting Cinema backend in a new window..."
+Start-Process powershell -ArgumentList '-NoExit', '-ExecutionPolicy', 'Bypass', '-Command', $command -WorkingDirectory $projectRoot | Out-Null
 
-if (file_exists(\$maintenance = \$projectRoot.'/storage/framework/maintenance.php')) {
-    require \$maintenance;
+Write-Host "Waiting for backend on http://127.0.0.1:8000 ..."
+$ready = $false
+
+for ($attempt = 0; $attempt -lt 25; $attempt++) {
+    try {
+        & curl.exe -I --max-time 2 http://127.0.0.1:8000 > $null 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            $ready = $true
+            break
+        }
+    } catch {
+    }
+
+    Start-Sleep -Seconds 1
 }
 
-require \$projectRoot.'/vendor/autoload.php';
-
-/** @var Application \$app */
-\$app = require_once \$projectRoot.'/bootstrap/app.php';
-
-\$app->handleRequest(Request::capture());
-"@
-
-Set-Content -Path $routerPath -Value $routerContent -Encoding utf8 -Force
-
-if (-not $Inline) {
-    $command = "& '$PSCommandPath' -Inline -BindHost '$BindHost' -Port $Port"
-    Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $command | Out-Null
-    Write-Host "Server window opened."
-    Write-Host "URL: http://$BindHost`:$Port"
-    Write-Host "Router: $routerPath"
-    exit 0
+if (-not $ready) {
+    throw 'Backend did not start in time.'
 }
 
-Write-Host "Starting Cinema backend on http://$BindHost`:$Port"
-Write-Host "Project: $projectRoot"
-Write-Host "Router: $routerPath"
-
-& php -S "$BindHost`:$Port" -t $publicRoot $routerPath
+Write-Host "Backend is ready."

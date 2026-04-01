@@ -1,2 +1,3 @@
 @echo off
-powershell -NoExit -ExecutionPolicy Bypass -File "%~dp0start-mobile-server.ps1" -Inline
+cd /d "%~dp0"
+powershell -ExecutionPolicy Bypass -File "%~dp0start-mobile-server.ps1" -Inline
