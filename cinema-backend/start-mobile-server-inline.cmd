@@ -1,3 +1,5 @@
 @echo off
+setlocal
+
 cd /d "%~dp0"
-powershell -ExecutionPolicy Bypass -File "%~dp0start-mobile-server.ps1" -Inline
+php -S 0.0.0.0:8000 -t public public/index.php

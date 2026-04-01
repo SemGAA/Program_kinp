@@ -1,12 +1,18 @@
 import { getApiBaseUrl, refreshApiBaseUrl } from '@/lib/runtime-config';
+import {
+  getDirectMovieDetails,
+  getDirectMovieRecommendations,
+  hasDirectTmdbConfig,
+  searchDirectTmdb,
+} from '@/lib/tmdb-direct';
 import type {
   AuthResponse,
   AuthUser,
   Friend,
   FriendRequest,
   FriendRequestsPayload,
-  MovieDetails,
   MediaType,
+  MovieDetails,
   MovieNote,
   MovieRecommendation,
   MovieSearchResult,
@@ -84,9 +90,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   const executeFetch = (baseUrl: string) =>
     fetch(`${baseUrl}${path}`, {
-      method: options.method ?? 'GET',
-      headers,
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      headers,
+      method: options.method ?? 'GET',
     });
 
   const initialBaseUrl = getApiBaseUrl();
@@ -136,15 +142,15 @@ export async function registerUser(payload: {
   password: string;
 }) {
   return request<AuthResponse>('/register', {
-    method: 'POST',
     body: payload,
+    method: 'POST',
   });
 }
 
 export async function loginUser(payload: { email: string; password: string }) {
   return request<AuthResponse>('/login', {
-    method: 'POST',
     body: payload,
+    method: 'POST',
   });
 }
 
@@ -162,6 +168,13 @@ export async function getCurrentUser(token: string) {
 }
 
 export async function searchMovies(query: string, token: string) {
+  if (hasDirectTmdbConfig()) {
+    try {
+      return await searchDirectTmdb(query);
+    } catch {
+    }
+  }
+
   const payload = await request<{ data: MovieSearchResult[] }>(
     `/movies/search?q=${encodeURIComponent(query)}`,
     { token },
@@ -171,6 +184,13 @@ export async function searchMovies(query: string, token: string) {
 }
 
 export async function getMovieDetails(tmdbId: number, mediaType: MediaType, token: string) {
+  if (hasDirectTmdbConfig()) {
+    try {
+      return await getDirectMovieDetails(tmdbId, mediaType);
+    } catch {
+    }
+  }
+
   const payload = await request<{ data: MovieDetails }>(
     `/movies/${tmdbId}?mediaType=${encodeURIComponent(mediaType)}`,
     { token },
@@ -184,6 +204,13 @@ export async function getMovieRecommendations(
   note: string,
   token: string,
 ) {
+  if (hasDirectTmdbConfig()) {
+    try {
+      return await getDirectMovieRecommendations(tmdbId, mediaType);
+    } catch {
+    }
+  }
+
   const params = new URLSearchParams();
   params.set('mediaType', mediaType);
   if (note) {
@@ -214,8 +241,8 @@ export async function createNote(
   token: string,
 ) {
   const response = await request<{ data: MovieNote }>('/notes', {
-    method: 'POST',
     body: payload,
+    method: 'POST',
     token,
   });
 
@@ -224,8 +251,8 @@ export async function createNote(
 
 export async function updateNote(noteId: number, noteText: string, token: string) {
   const response = await request<{ data: MovieNote }>(`/notes/${noteId}`, {
-    method: 'PATCH',
     body: { note_text: noteText },
+    method: 'PATCH',
     token,
   });
 
@@ -234,8 +261,8 @@ export async function updateNote(noteId: number, noteText: string, token: string
 
 export async function shareNote(noteId: number, recipientId: number, token: string) {
   const response = await request<{ data: MovieNote }>(`/notes/${noteId}/share`, {
-    method: 'POST',
     body: { recipient_id: recipientId },
+    method: 'POST',
     token,
   });
 
@@ -271,8 +298,8 @@ export async function getFriendRequests(token: string) {
 
 export async function sendFriendRequest(email: string, token: string) {
   const payload = await request<{ data: FriendRequest }>('/friend-requests', {
-    method: 'POST',
     body: { email },
+    method: 'POST',
     token,
   });
 
@@ -312,8 +339,8 @@ export async function createWatchRoom(
   token: string,
 ) {
   const response = await request<{ data: WatchRoom }>('/watch-rooms', {
-    method: 'POST',
     body: payload,
+    method: 'POST',
     token,
   });
 
@@ -322,8 +349,8 @@ export async function createWatchRoom(
 
 export async function joinWatchRoom(code: string, token: string) {
   const response = await request<{ data: WatchRoom }>('/watch-rooms/join', {
-    method: 'POST',
     body: { code },
+    method: 'POST',
     token,
   });
 
@@ -350,8 +377,8 @@ export async function syncWatchRoomPlayback(
   const response = await request<{ data: WatchPlayback }>(
     `/watch-rooms/${encodeURIComponent(code)}/sync`,
     {
-      method: 'POST',
       body: payload,
+      method: 'POST',
       token,
     },
   );
@@ -370,8 +397,8 @@ export async function sendWatchRoomMessage(
   const response = await request<{ data: WatchRoomMessage }>(
     `/watch-rooms/${encodeURIComponent(code)}/messages`,
     {
-      method: 'POST',
       body: payload,
+      method: 'POST',
       token,
     },
   );

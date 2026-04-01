@@ -65,7 +65,7 @@ export default function MovieDetailsScreen() {
   useEffect(() => {
     const loadMovie = async () => {
       if (!token || !Number.isFinite(tmdbId)) {
-        setError('Некорректный идентификатор фильма.');
+        setError('Некорректный идентификатор тайтла.');
         setIsLoading(false);
         return;
       }
@@ -92,7 +92,7 @@ export default function MovieDetailsScreen() {
           setNoteText(initialOwnNote);
         }
       } catch (caughtError) {
-        const message = caughtError instanceof ApiError ? caughtError.message : 'Не удалось загрузить фильм.';
+        const message = caughtError instanceof ApiError ? caughtError.message : 'Не удалось загрузить карточку.';
         setError(message);
       } finally {
         setIsLoading(false);
@@ -108,7 +108,7 @@ export default function MovieDetailsScreen() {
     }
 
     if (!noteText.trim()) {
-      Alert.alert('Пустая заметка', 'Добавьте пару строк о фильме перед сохранением.');
+      Alert.alert('Пустая заметка', 'Добавьте пару строк о тайтле перед сохранением.');
       return;
     }
 
@@ -136,8 +136,7 @@ export default function MovieDetailsScreen() {
       await refreshUser();
       Alert.alert('Сохранено', 'Заметка обновлена.');
     } catch (caughtError) {
-      const message =
-        caughtError instanceof ApiError ? caughtError.message : 'Не удалось сохранить заметку.';
+      const message = caughtError instanceof ApiError ? caughtError.message : 'Не удалось сохранить заметку.';
       setError(message);
     } finally {
       setIsSaving(false);
@@ -250,7 +249,7 @@ export default function MovieDetailsScreen() {
                 ))}
               </View>
               <Text style={sharedStyles.helperText}>
-                {movie.overview || 'Описание для этого фильма отсутствует.'}
+                {movie.overview || 'Описание для этого тайтла отсутствует.'}
               </Text>
             </View>
           </View>
@@ -275,7 +274,7 @@ export default function MovieDetailsScreen() {
               multiline
               numberOfLines={6}
               onChangeText={setNoteText}
-              placeholder="Напишите, почему этот фильм стоит посмотреть и что в нём цепляет."
+              placeholder="Напишите, почему этот тайтл стоит посмотреть и что в нём цепляет."
               placeholderTextColor={AppColors.textSecondary}
               style={[sharedStyles.input, styles.textArea]}
               textAlignVertical="top"
@@ -299,7 +298,7 @@ export default function MovieDetailsScreen() {
                 {isLoadingRecommendations ? (
                   <ActivityIndicator color={AppColors.textPrimary} />
                 ) : (
-                  <Text style={sharedStyles.secondaryButtonText}>Похожие фильмы</Text>
+                  <Text style={sharedStyles.secondaryButtonText}>Похожие тайтлы</Text>
                 )}
               </Pressable>
             </View>
@@ -342,7 +341,18 @@ export default function MovieDetailsScreen() {
             <View style={styles.recommendationsBlock}>
               <Text style={styles.sectionTitle}>Рекомендации</Text>
               {recommendations.map((recommendation) => (
-                <View key={recommendation.id} style={[sharedStyles.card, styles.recommendationCard]}>
+                <Pressable
+                  key={`${recommendation.mediaType}-${recommendation.id}`}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/movie/[tmdbId]',
+                      params: {
+                        mediaType: recommendation.mediaType,
+                        tmdbId: String(recommendation.id),
+                      },
+                    })
+                  }
+                  style={[sharedStyles.card, styles.recommendationCard]}>
                   <Text style={styles.recommendationTitle}>{recommendation.title}</Text>
                   <Text style={sharedStyles.helperText}>
                     {recommendation.mediaLabel}
@@ -350,9 +360,9 @@ export default function MovieDetailsScreen() {
                     {recommendation.rating ? ` • рейтинг ${recommendation.rating.toFixed(1)}` : ''}
                   </Text>
                   <Text numberOfLines={4} style={sharedStyles.helperText}>
-                    {recommendation.overview || 'Описание пока не доступно.'}
+                    {recommendation.overview || 'Описание пока недоступно.'}
                   </Text>
-                </View>
+                </Pressable>
               ))}
             </View>
           ) : null}

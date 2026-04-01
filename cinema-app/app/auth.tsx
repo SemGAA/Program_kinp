@@ -33,6 +33,7 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [apiUrlDraft, setApiUrlDraft] = useState(apiBaseUrl);
   const [error, setError] = useState<string | null>(null);
+  const [showManualServerControls, setShowManualServerControls] = useState(false);
   const [isRefreshingApiUrl, setIsRefreshingApiUrl] = useState(false);
   const [isSavingApiUrl, setIsSavingApiUrl] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -74,7 +75,7 @@ export default function AuthScreen() {
       let message = 'Не удалось выполнить запрос.';
 
       if (caughtError instanceof ApiConnectionError) {
-        message = `Нет подключения к серверу (${apiBaseUrl}). Проверьте адрес API и доступность backend.`;
+        message = `Нет подключения к серверу (${apiBaseUrl}). Проверьте, что backend запущен и публичный адрес обновился.`;
       } else if (caughtError instanceof ApiError) {
         message = caughtError.message;
       }
@@ -149,27 +150,18 @@ export default function AuthScreen() {
           <Text style={styles.eyebrow}>Cinema Notes</Text>
           <Text style={styles.title}>Вход и совместный просмотр</Text>
           <Text style={styles.subtitle}>
-            Приложение хранит заметки, комнаты совместного просмотра и синхронизацию через backend API.
+            Адрес backend подхватывается автоматически. Обычному пользователю ничего вручную
+            вводить не нужно.
           </Text>
         </View>
 
         <View style={styles.serverCard}>
           <Text style={styles.serverTitle}>Подключение к серверу</Text>
           <Text style={styles.serverHint}>
-            Активный адрес подхватывается автоматически. Ручной ввод нужен только если хотите
-            переопределить сервер вручную.
+            Приложение само подтягивает свежий публичный адрес. Ручной ввод нужен только как
+            запасной вариант.
           </Text>
           <Text style={styles.serverValue}>Сейчас используется: {apiBaseUrl}</Text>
-          <TextInput
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-            onChangeText={setApiUrlDraft}
-            placeholder="https://your-public-backend.example/api"
-            placeholderTextColor={AppColors.textSecondary}
-            style={styles.input}
-            value={apiUrlDraft}
-          />
           <View style={styles.serverButtonRow}>
             <Pressable
               onPress={() => void handleRefreshApiUrl()}
@@ -181,22 +173,43 @@ export default function AuthScreen() {
               )}
             </Pressable>
           </View>
-          <View style={styles.serverButtonRow}>
-            <Pressable
-              onPress={() => void handleSaveApiUrl()}
-              style={[styles.secondaryButton, styles.flexButton]}>
-              {isSavingApiUrl ? (
-                <ActivityIndicator color={AppColors.textPrimary} />
-              ) : (
-                <Text style={styles.secondaryButtonText}>Сохранить адрес</Text>
-              )}
-            </Pressable>
-            <Pressable
-              onPress={() => void handleResetApiUrl()}
-              style={[styles.ghostButton, styles.flexButton]}>
-              <Text style={styles.ghostButtonText}>Сбросить</Text>
-            </Pressable>
-          </View>
+          <Pressable
+            onPress={() => setShowManualServerControls((currentValue) => !currentValue)}
+            style={styles.ghostButton}>
+            <Text style={styles.ghostButtonText}>
+              {showManualServerControls ? 'Скрыть ручные настройки' : 'Показать ручные настройки'}
+            </Text>
+          </Pressable>
+          {showManualServerControls ? (
+            <>
+              <TextInput
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                onChangeText={setApiUrlDraft}
+                placeholder="https://your-public-backend.example/api"
+                placeholderTextColor={AppColors.textSecondary}
+                style={styles.input}
+                value={apiUrlDraft}
+              />
+              <View style={styles.serverButtonRow}>
+                <Pressable
+                  onPress={() => void handleSaveApiUrl()}
+                  style={[styles.secondaryButton, styles.flexButton]}>
+                  {isSavingApiUrl ? (
+                    <ActivityIndicator color={AppColors.textPrimary} />
+                  ) : (
+                    <Text style={styles.secondaryButtonText}>Сохранить адрес</Text>
+                  )}
+                </Pressable>
+                <Pressable
+                  onPress={() => void handleResetApiUrl()}
+                  style={[styles.ghostButton, styles.flexButton]}>
+                  <Text style={styles.ghostButtonText}>Сбросить</Text>
+                </Pressable>
+              </View>
+            </>
+          ) : null}
         </View>
 
         <View style={styles.switchRow}>

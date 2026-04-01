@@ -32,8 +32,8 @@ export default function SearchScreen() {
     setIsLoading(true);
 
     try {
-      const movies = await searchMovies(query.trim(), token);
-      setResults(movies);
+      const media = await searchMovies(query.trim(), token);
+      setResults(media);
     } catch (caughtError) {
       const message = caughtError instanceof ApiError ? caughtError.message : 'Не удалось выполнить поиск.';
       setError(message);
@@ -53,7 +53,7 @@ export default function SearchScreen() {
           autoCorrect={false}
           onChangeText={setQuery}
           onSubmitEditing={handleSearch}
-          placeholder="Название фильма"
+          placeholder="Название фильма или сериала"
           placeholderTextColor={AppColors.textSecondary}
           style={sharedStyles.input}
           value={query}
@@ -62,7 +62,7 @@ export default function SearchScreen() {
           {isLoading ? (
             <ActivityIndicator color={AppColors.textPrimary} />
           ) : (
-            <Text style={sharedStyles.primaryButtonText}>Найти фильм</Text>
+            <Text style={sharedStyles.primaryButtonText}>Найти</Text>
           )}
         </Pressable>
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -70,13 +70,13 @@ export default function SearchScreen() {
 
       {results.map((movie) => (
         <Pressable
-          key={movie.id}
+          key={`${movie.mediaType}-${movie.id}`}
           onPress={() =>
             router.push({
               pathname: '/movie/[tmdbId]',
               params: {
-                tmdbId: String(movie.id),
                 mediaType: movie.mediaType,
+                tmdbId: String(movie.id),
               },
             })
           }
@@ -90,7 +90,7 @@ export default function SearchScreen() {
               {movie.rating ? ` • рейтинг ${movie.rating.toFixed(1)}` : ''}
             </Text>
             <Text numberOfLines={4} style={sharedStyles.helperText}>
-              {movie.overview || 'Описание пока не доступно.'}
+              {movie.overview || 'Описание пока недоступно.'}
             </Text>
           </View>
         </Pressable>
@@ -107,8 +107,9 @@ export default function SearchScreen() {
       {!hasSearched ? (
         <View style={sharedStyles.card}>
           <Text style={sharedStyles.emptyText}>
-            Начните с поиска фильма, сериала, дорамы, аниме или мультсериала. После открытия карточки
-            можно сохранить заметку и создать комнату просмотра по прямой ссылке на видео.
+            Начните с поиска фильма, сериала, дорамы, аниме или мультсериала. После открытия
+            карточки можно сохранить заметку и создать комнату просмотра по прямой ссылке на
+            видео.
           </Text>
         </View>
       ) : null}
