@@ -1,0 +1,66 @@
+services:
+  - type: web
+    name: cinema-backend-api
+    runtime: docker
+    rootDir: cinema-backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /up
+    autoDeploy: true
+    preDeployCommand: php artisan migrate --force
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: false
+      - key: APP_URL
+        sync: false
+      - key: APP_KEY
+        sync: false
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: LOG_LEVEL
+        value: info
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_HOST
+        fromDatabase:
+          name: cinema-backend-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: cinema-backend-db
+          property: port
+      - key: DB_DATABASE
+        fromDatabase:
+          name: cinema-backend-db
+          property: database
+      - key: DB_USERNAME
+        fromDatabase:
+          name: cinema-backend-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: cinema-backend-db
+          property: password
+      - key: DB_SSLMODE
+        value: require
+      - key: SESSION_DRIVER
+        value: file
+      - key: CACHE_STORE
+        value: file
+      - key: QUEUE_CONNECTION
+        value: sync
+      - key: BROADCAST_CONNECTION
+        value: log
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: TMDB_API_KEY
+        sync: false
+      - key: HF_TOKEN
+        sync: false
+
+databases:
+  - name: cinema-backend-db
+    databaseName: cinema_backend
+    user: cinema_backend

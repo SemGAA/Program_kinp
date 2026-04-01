@@ -1,0 +1,28 @@
+# Root workspace
+*.log
+.DS_Store
+Thumbs.db
+
+# App local files
+cinema-app/.expo/
+cinema-app/node_modules/
+cinema-app/dist/
+cinema-app/web-build/
+cinema-app/.env*.local
+
+# Backend local files
+cinema-backend/node_modules/
+cinema-backend/vendor/
+cinema-backend/.env
+cinema-backend/.env.backup
+cinema-backend/.env.production
+cinema-backend/storage/logs/*
+cinema-backend/storage/framework/cache/*
+cinema-backend/storage/framework/sessions/*
+cinema-backend/storage/framework/testing/*
+cinema-backend/storage/framework/views/*
+cinema-backend/bootstrap/cache/*
+
+# OS / editors
+.vscode/
+.idea/

@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+!.env.render.example
+node_modules
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/testing/*
+storage/framework/views/*
+tests
+.phpunit.result.cache
+npm-debug.log
+yarn-error.log
+Dockerfile*
+render.yaml
