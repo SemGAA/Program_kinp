@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
 import http from 'node:http';
+import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -139,6 +140,39 @@ async function publishBootstrap(apiBaseUrl) {
   }
 
   console.log('Bootstrap URL published to GitHub.');
+}
+
+function isPrivateIpv4(address) {
+  return (
+    /^10\./.test(address) ||
+    /^192\.168\./.test(address) ||
+    /^172\.(1[6-9]|2\d|3[0-1])\./.test(address)
+  );
+}
+
+function resolveLanApiBaseUrl() {
+  const interfaces = os.networkInterfaces();
+  const preferredAliases = ['Ethernet', 'Wi-Fi', 'WLAN'];
+
+  for (const preferredAlias of preferredAliases) {
+    const candidates = interfaces[preferredAlias] ?? [];
+
+    for (const candidate of candidates) {
+      if (candidate.family === 'IPv4' && !candidate.internal && isPrivateIpv4(candidate.address)) {
+        return `http://${candidate.address}:8000/api`;
+      }
+    }
+  }
+
+  for (const candidates of Object.values(interfaces)) {
+    for (const candidate of candidates ?? []) {
+      if (candidate.family === 'IPv4' && !candidate.internal && isPrivateIpv4(candidate.address)) {
+        return `http://${candidate.address}:8000/api`;
+      }
+    }
+  }
+
+  return null;
 }
 
 function wireTunnelOutput(stream, onLine) {
@@ -304,6 +338,20 @@ async function main() {
 
   console.log(`Waiting for backend on ${backendHealthUrl} ...`);
   await waitForBackend();
+
+  const lanApiBaseUrl = resolveLanApiBaseUrl();
+
+  if (lanApiBaseUrl) {
+    console.log('');
+    console.log(`Publishing LAN API URL first: ${lanApiBaseUrl}`);
+    try {
+      await publishBootstrap(lanApiBaseUrl);
+      console.log('Same-network phones can connect immediately.');
+    } catch (error) {
+      console.warn('Unable to publish LAN bootstrap URL.');
+      console.warn(error instanceof Error ? error.message : String(error));
+    }
+  }
 
   await startPublicTunnel();
 }

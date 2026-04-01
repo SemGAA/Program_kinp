@@ -1,5 +1,5 @@
-{
-  "apiBaseUrl": "https://40b1b8af8adea1.lhr.life/api",
-  "source": "public-tunnel",
-  "updatedAt": "2026-04-01T20:48:42.041Z"
+﻿{
+  "apiBaseUrl": "http://192.168.0.102:8000/api",
+  "source": "lan-fallback",
+  "updatedAt": "2026-04-01T21:05:00.000Z"
 }
