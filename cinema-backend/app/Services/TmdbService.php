@@ -11,7 +11,7 @@ class TmdbService
 
     public function configured(): bool
     {
-        return filled(config('services.tmdb.key'));
+        return filled(config('services.tmdb.key')) || filled(config('services.tmdb.read_access_token'));
     }
 
     public function searchMovies(string $query): array
@@ -82,15 +82,23 @@ class TmdbService
 
     private function client(): PendingRequest
     {
-        return Http::acceptJson()
+        $client = Http::acceptJson()
             ->baseUrl((string) config('services.tmdb.base_url'))
             ->timeout(15);
+
+        $token = config('services.tmdb.read_access_token');
+
+        if (filled($token)) {
+            $client = $client->withToken((string) $token);
+        }
+
+        return $client;
     }
 
     private function get(string $uri, array $query = []): array
     {
         $response = $this->client()->get($uri, array_filter([
-            'api_key' => config('services.tmdb.key'),
+            'api_key' => filled(config('services.tmdb.read_access_token')) ? null : config('services.tmdb.key'),
             ...$query,
         ], static fn ($value) => filled($value)));
 
