@@ -1,6 +1,7 @@
 services:
   - type: web
     name: cinema-backend-api
+    plan: free
     runtime: docker
     rootDir: cinema-backend
     dockerfilePath: ./Dockerfile
@@ -62,5 +63,6 @@ services:
 
 databases:
   - name: cinema-backend-db
+    plan: free
     databaseName: cinema_backend
     user: cinema_backend
