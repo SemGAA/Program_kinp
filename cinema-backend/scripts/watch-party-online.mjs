@@ -14,6 +14,7 @@ const bootstrapFile = path.join(projectRoot, 'mobile-bootstrap.json');
 const backendHealthUrl = 'http://127.0.0.1:8000';
 
 let tunnelProcess = null;
+let currentLanApiBaseUrl = null;
 
 function sleep(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -103,10 +104,17 @@ function runGit(args, allowFailure = false) {
   });
 }
 
-async function publishBootstrap(apiBaseUrl) {
+async function publishBootstrap({
+  apiBaseUrl,
+  lanApiBaseUrl = null,
+  publicApiBaseUrl = null,
+  source = 'public-tunnel',
+}) {
   const payload = {
     apiBaseUrl,
-    source: 'public-tunnel',
+    lanApiBaseUrl,
+    publicApiBaseUrl,
+    source,
     updatedAt: new Date().toISOString(),
   };
 
@@ -228,16 +236,26 @@ function startTunnel(provider) {
       resolved = true;
 
       const publicUrl = urlMatch[0];
-      const apiBaseUrl = `${publicUrl}/api`;
+      const publicApiBaseUrl = `${publicUrl}/api`;
+      const apiBaseUrl = currentLanApiBaseUrl ?? publicApiBaseUrl;
 
       console.log('');
       console.log(`Public URL: ${publicUrl}`);
-      console.log(`API URL: ${apiBaseUrl}`);
+      console.log(`Public API URL: ${publicApiBaseUrl}`);
+      if (currentLanApiBaseUrl) {
+        console.log(`LAN API URL: ${currentLanApiBaseUrl}`);
+        console.log(`Preferred API URL: ${apiBaseUrl}`);
+      }
       console.log('');
       console.log('Publishing the current API address for the mobile app...');
 
       try {
-        await publishBootstrap(apiBaseUrl);
+        await publishBootstrap({
+          apiBaseUrl,
+          lanApiBaseUrl: currentLanApiBaseUrl,
+          publicApiBaseUrl,
+          source: currentLanApiBaseUrl ? 'lan-plus-public' : 'public-tunnel',
+        });
       } catch (error) {
         console.warn('Unable to publish bootstrap URL automatically.');
         console.warn(error instanceof Error ? error.message : String(error));
@@ -340,12 +358,17 @@ async function main() {
   await waitForBackend();
 
   const lanApiBaseUrl = resolveLanApiBaseUrl();
+  currentLanApiBaseUrl = lanApiBaseUrl;
 
   if (lanApiBaseUrl) {
     console.log('');
     console.log(`Publishing LAN API URL first: ${lanApiBaseUrl}`);
     try {
-      await publishBootstrap(lanApiBaseUrl);
+      await publishBootstrap({
+        apiBaseUrl: lanApiBaseUrl,
+        lanApiBaseUrl,
+        source: 'lan-fallback',
+      });
       console.log('Same-network phones can connect immediately.');
     } catch (error) {
       console.warn('Unable to publish LAN bootstrap URL.');

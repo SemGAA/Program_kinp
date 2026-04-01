@@ -7,6 +7,11 @@ use App\Http\Controllers\Api\NoteController;
 use App\Http\Controllers\Api\WatchRoomController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/ping', static fn () => response()->json([
+    'ok' => true,
+    'timestamp' => now()->toIso8601String(),
+]));
+
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
