@@ -6,6 +6,7 @@ import type {
   FriendRequest,
   FriendRequestsPayload,
   MovieDetails,
+  MediaType,
   MovieNote,
   MovieRecommendation,
   MovieSearchResult,
@@ -169,15 +170,28 @@ export async function searchMovies(query: string, token: string) {
   return payload.data;
 }
 
-export async function getMovieDetails(tmdbId: number, token: string) {
-  const payload = await request<{ data: MovieDetails }>(`/movies/${tmdbId}`, { token });
+export async function getMovieDetails(tmdbId: number, mediaType: MediaType, token: string) {
+  const payload = await request<{ data: MovieDetails }>(
+    `/movies/${tmdbId}?mediaType=${encodeURIComponent(mediaType)}`,
+    { token },
+  );
   return payload.data;
 }
 
-export async function getMovieRecommendations(tmdbId: number, note: string, token: string) {
-  const query = note ? `?note=${encodeURIComponent(note)}` : '';
+export async function getMovieRecommendations(
+  tmdbId: number,
+  mediaType: MediaType,
+  note: string,
+  token: string,
+) {
+  const params = new URLSearchParams();
+  params.set('mediaType', mediaType);
+  if (note) {
+    params.set('note', note);
+  }
+
   const payload = await request<{ data: MovieRecommendation[] }>(
-    `/movies/${tmdbId}/recommendations${query}`,
+    `/movies/${tmdbId}/recommendations?${params.toString()}`,
     { token },
   );
 
@@ -192,6 +206,7 @@ export async function createNote(
   payload: {
     movie_title: string;
     note_text: string;
+    media_type?: MediaType;
     poster_path?: string | null;
     release_year?: number | null;
     tmdb_id: number;
@@ -288,6 +303,7 @@ export async function getWatchRooms(token: string) {
 export async function createWatchRoom(
   payload: {
     movie_title: string;
+    media_type?: MediaType;
     poster_path?: string | null;
     release_year?: number | null;
     tmdb_id?: number | null;

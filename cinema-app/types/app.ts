@@ -1,3 +1,5 @@
+export type MediaType = 'movie' | 'tv';
+
 export type AuthUser = {
   id: number;
   name: string;
@@ -10,12 +12,14 @@ export type AuthUser = {
 
 export type MovieSearchResult = {
   id: number;
+  mediaType: MediaType;
   title: string;
   overview: string;
   posterPath: string | null;
   posterUrl: string | null;
   releaseYear: number | null;
   rating: number | null;
+  mediaLabel: string;
 };
 
 export type MovieDetails = MovieSearchResult & {
@@ -37,6 +41,7 @@ export type NoteStatus = 'pending' | 'sent' | 'accepted' | 'rejected';
 
 export type MovieNote = {
   id: number;
+  mediaType: MediaType;
   tmdbId: number;
   movieTitle: string;
   posterPath: string | null;
@@ -102,6 +107,7 @@ export type WatchRoomSummary = {
   code: string;
   host: PersonPreview | null;
   isHost: boolean;
+  mediaType: MediaType;
   memberCount: number;
   movieTitle: string;
   playback: WatchPlayback;

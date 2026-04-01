@@ -15,6 +15,7 @@ class WatchRoom extends Model
         'code',
         'host_user_id',
         'tmdb_id',
+        'media_type',
         'movie_title',
         'poster_path',
         'release_year',

@@ -31,6 +31,7 @@ class NoteApiTest extends TestCase
 
         $createResponse = $this->postJson('/api/notes', [
             'tmdb_id' => 42,
+            'media_type' => 'tv',
             'movie_title' => 'Interstellar',
             'poster_path' => '/poster.jpg',
             'release_year' => 2014,
@@ -52,6 +53,7 @@ class NoteApiTest extends TestCase
         $this->postJson("/api/notes/{$noteId}/accept")
             ->assertOk()
             ->assertJsonPath('data.status', 'accepted')
+            ->assertJsonPath('data.mediaType', 'tv')
             ->assertJsonPath('data.recipient.id', $friend->id);
     }
 
@@ -64,6 +66,7 @@ class NoteApiTest extends TestCase
         $note = MovieNote::query()->create([
             'user_id' => $owner->id,
             'tmdb_id' => 7,
+            'media_type' => 'movie',
             'movie_title' => 'Dune',
             'note_text' => 'Discuss after watching.',
             'movie_id' => 7,

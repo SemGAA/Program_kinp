@@ -13,6 +13,7 @@ class MovieNote extends Model
     protected $fillable = [
         'user_id',
         'tmdb_id',
+        'media_type',
         'movie_title',
         'poster_path',
         'release_year',
@@ -27,6 +28,8 @@ class MovieNote extends Model
     ];
 
     protected $casts = [
+        'tmdb_id' => 'integer',
+        'release_year' => 'integer',
         'sent_at' => 'datetime',
         'responded_at' => 'datetime',
     ];

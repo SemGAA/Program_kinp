@@ -46,7 +46,7 @@ export default function SearchScreen() {
   return (
     <AppShell
       title="Поиск"
-      subtitle="Найдите фильм, откройте карточку и создайте заметку или комнату совместного просмотра.">
+      subtitle="Ищите фильмы, сериалы, дорамы, аниме и мультсериалы. Из карточки можно сохранить заметку и открыть комнату просмотра.">
       <View style={[sharedStyles.card, styles.searchCard]}>
         <TextInput
           autoCapitalize="none"
@@ -74,7 +74,10 @@ export default function SearchScreen() {
           onPress={() =>
             router.push({
               pathname: '/movie/[tmdbId]',
-              params: { tmdbId: String(movie.id) },
+              params: {
+                tmdbId: String(movie.id),
+                mediaType: movie.mediaType,
+              },
             })
           }
           style={[sharedStyles.card, styles.movieCard]}>
@@ -82,7 +85,8 @@ export default function SearchScreen() {
           <View style={styles.movieCopy}>
             <Text style={styles.movieTitle}>{movie.title}</Text>
             <Text style={sharedStyles.helperText}>
-              {movie.releaseYear ? `${movie.releaseYear}` : 'Год не указан'}
+              {movie.mediaLabel}
+              {movie.releaseYear ? ` • ${movie.releaseYear}` : ' • год не указан'}
               {movie.rating ? ` • рейтинг ${movie.rating.toFixed(1)}` : ''}
             </Text>
             <Text numberOfLines={4} style={sharedStyles.helperText}>
@@ -103,8 +107,8 @@ export default function SearchScreen() {
       {!hasSearched ? (
         <View style={sharedStyles.card}>
           <Text style={sharedStyles.emptyText}>
-            Начните с поиска фильма. После открытия карточки можно сохранить заметку и создать комнату
-            просмотра по прямой ссылке на видео.
+            Начните с поиска фильма, сериала, дорамы, аниме или мультсериала. После открытия карточки
+            можно сохранить заметку и создать комнату просмотра по прямой ссылке на видео.
           </Text>
         </View>
       ) : null}

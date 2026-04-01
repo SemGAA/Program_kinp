@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Http;
 
 class TmdbService
 {
+    private const SUPPORTED_MEDIA_TYPES = ['movie', 'tv'];
+
     public function configured(): bool
     {
         return filled(config('services.tmdb.key'));
@@ -18,37 +20,51 @@ class TmdbService
             return $this->fallbackSearchMovies($query);
         }
 
-        $payload = $this->get('search/movie', [
+        $payload = $this->get('search/multi', [
             'query' => $query,
             'language' => 'ru-RU',
             'include_adult' => 'false',
         ]);
 
-        return array_map(fn (array $movie) => $this->formatSummary($movie), $payload['results'] ?? []);
+        return collect($payload['results'] ?? [])
+            ->filter(fn (array $item) => in_array($item['media_type'] ?? 'movie', self::SUPPORTED_MEDIA_TYPES, true))
+            ->map(fn (array $item) => $this->formatSummary($item))
+            ->values()
+            ->all();
     }
 
-    public function getMovie(int $tmdbId): array
+    public function getMovie(int $tmdbId, string $mediaType = 'movie'): array
     {
+        $normalizedMediaType = $this->normalizeMediaType($mediaType);
+
         if (! $this->configured()) {
-            return $this->fallbackGetMovie($tmdbId);
+            return $this->fallbackGetMovie($tmdbId, $normalizedMediaType);
         }
 
-        return $this->formatDetails($this->get("movie/{$tmdbId}", [
+        return $this->formatDetails($this->get("{$normalizedMediaType}/{$tmdbId}", [
             'language' => 'ru-RU',
-        ]));
+        ]), $normalizedMediaType);
     }
 
-    public function getRecommendations(int $tmdbId): array
+    public function getRecommendations(int $tmdbId, string $mediaType = 'movie'): array
     {
+        $normalizedMediaType = $this->normalizeMediaType($mediaType);
+
         if (! $this->configured()) {
-            return $this->fallbackRecommendations($tmdbId);
+            return $this->fallbackRecommendations($tmdbId, $normalizedMediaType);
         }
 
-        $payload = $this->get("movie/{$tmdbId}/recommendations", [
+        $payload = $this->get("{$normalizedMediaType}/{$tmdbId}/recommendations", [
             'language' => 'ru-RU',
         ]);
 
-        return array_map(fn (array $movie) => $this->formatSummary($movie), $payload['results'] ?? []);
+        return array_map(
+            fn (array $item) => $this->formatSummary([
+                ...$item,
+                'media_type' => $normalizedMediaType,
+            ]),
+            $payload['results'] ?? []
+        );
     }
 
     public function imageUrl(?string $path): ?string
@@ -83,23 +99,32 @@ class TmdbService
 
     private function formatSummary(array $movie): array
     {
+        $mediaType = $this->normalizeMediaType($movie['media_type'] ?? null);
         $title = (string) ($movie['title'] ?? $movie['name'] ?? 'Untitled');
+        $releaseDate = $mediaType === 'tv'
+            ? ($movie['first_air_date'] ?? null)
+            : ($movie['release_date'] ?? null);
 
         return [
             'id' => (int) $movie['id'],
+            'mediaType' => $mediaType,
+            'mediaLabel' => $this->mediaLabel($mediaType),
             'title' => $title,
             'overview' => (string) ($movie['overview'] ?? ''),
             'posterPath' => $movie['poster_path'] ?? null,
             'posterUrl' => $this->imageUrl($movie['poster_path'] ?? null),
-            'releaseYear' => $this->extractYear($movie['release_date'] ?? null),
+            'releaseYear' => $this->extractYear($releaseDate),
             'rating' => isset($movie['vote_average']) ? (float) $movie['vote_average'] : null,
         ];
     }
 
-    private function formatDetails(array $movie): array
+    private function formatDetails(array $movie, string $mediaType = 'movie'): array
     {
         return [
-            ...$this->formatSummary($movie),
+            ...$this->formatSummary([
+                ...$movie,
+                'media_type' => $this->normalizeMediaType($movie['media_type'] ?? $mediaType),
+            ]),
             'backdropPath' => $movie['backdrop_path'] ?? null,
             'backdropUrl' => $this->imageUrl($movie['backdrop_path'] ?? null),
             'genres' => array_values(array_map(
@@ -150,33 +175,38 @@ class TmdbService
         return $movies;
     }
 
-    private function fallbackGetMovie(int $tmdbId): array
+    private function fallbackGetMovie(int $tmdbId, string $mediaType = 'movie'): array
     {
-        $movie = collect($this->fallbackCatalog())->firstWhere('id', $tmdbId);
+        $movie = collect($this->fallbackCatalog())->first(
+            fn (array $item) => (int) $item['id'] === $tmdbId && $this->normalizeMediaType($item['media_type'] ?? null) === $mediaType
+        );
 
         abort_unless(is_array($movie), 404, 'Фильм не найден.');
 
         return $this->formatFallbackDetails($movie);
     }
 
-    private function fallbackRecommendations(int $tmdbId): array
+    private function fallbackRecommendations(int $tmdbId, string $mediaType = 'movie'): array
     {
         $catalog = $this->fallbackCatalog();
-        $movie = collect($catalog)->firstWhere('id', $tmdbId);
+        $movie = collect($catalog)->first(
+            fn (array $item) => (int) $item['id'] === $tmdbId && $this->normalizeMediaType($item['media_type'] ?? null) === $mediaType
+        );
 
         if (! is_array($movie)) {
             return [];
         }
 
         return collect($catalog)
-            ->filter(static fn (array $candidate) => $candidate['id'] !== $tmdbId)
+            ->filter(fn (array $candidate) => $candidate['id'] !== $tmdbId)
             ->map(function (array $candidate) use ($movie): array {
                 $sharedGenres = count(array_intersect($movie['genres'] ?? [], $candidate['genres'] ?? []));
                 $sharedAliases = count(array_intersect($movie['aliases'] ?? [], $candidate['aliases'] ?? []));
+                $sameMediaType = $this->normalizeMediaType($candidate['media_type'] ?? null) === $this->normalizeMediaType($movie['media_type'] ?? null);
 
                 return [
                     ...$candidate,
-                    '_score' => ($sharedGenres * 10) + ($sharedAliases * 3),
+                    '_score' => ($sameMediaType ? 20 : 0) + ($sharedGenres * 10) + ($sharedAliases * 3),
                 ];
             })
             ->sortByDesc('_score')
@@ -235,8 +265,12 @@ class TmdbService
 
     private function formatFallbackSummary(array $movie): array
     {
+        $mediaType = $this->normalizeMediaType($movie['media_type'] ?? null);
+
         return [
             'id' => (int) $movie['id'],
+            'mediaType' => $mediaType,
+            'mediaLabel' => $this->mediaLabel($mediaType),
             'title' => (string) $movie['title'],
             'overview' => (string) $movie['overview'],
             'posterPath' => null,
@@ -255,5 +289,15 @@ class TmdbService
             'genres' => array_values($movie['genres'] ?? []),
             'runtime' => (int) $movie['runtime'],
         ];
+    }
+
+    private function normalizeMediaType(?string $mediaType): string
+    {
+        return in_array($mediaType, self::SUPPORTED_MEDIA_TYPES, true) ? $mediaType : 'movie';
+    }
+
+    private function mediaLabel(string $mediaType): string
+    {
+        return $mediaType === 'tv' ? 'Сериал' : 'Фильм';
     }
 }

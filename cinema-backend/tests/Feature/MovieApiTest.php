@@ -18,10 +18,11 @@ class MovieApiTest extends TestCase
         config(['services.tmdb.key' => 'tmdb_test']);
 
         Http::fake([
-            'https://api.themoviedb.org/3/search/movie*' => Http::response([
+            'https://api.themoviedb.org/3/search/multi*' => Http::response([
                 'results' => [
                     [
                         'id' => 10,
+                        'media_type' => 'movie',
                         'title' => 'Interstellar',
                         'overview' => 'Space travel.',
                         'poster_path' => '/poster.jpg',
@@ -35,6 +36,7 @@ class MovieApiTest extends TestCase
         $this->getJson('/api/movies/search?q=inter')
             ->assertOk()
             ->assertJsonPath('data.0.id', 10)
+            ->assertJsonPath('data.0.mediaType', 'movie')
             ->assertJsonPath('data.0.title', 'Interstellar')
             ->assertJsonPath('data.0.posterUrl', 'https://image.tmdb.org/t/p/w500/poster.jpg')
             ->assertJsonPath('data.0.releaseYear', 2014);
@@ -50,16 +52,41 @@ class MovieApiTest extends TestCase
             ->assertJsonFragment(['title' => 'Побег из Шоушенка']);
     }
 
+    public function test_tv_search_falls_back_to_local_catalog_without_tmdb_key(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+        config(['services.tmdb.key' => null]);
+
+        $this->getJson('/api/movies/search?q=дорама')
+            ->assertOk()
+            ->assertJsonFragment([
+                'title' => 'Истинная красота',
+                'mediaType' => 'tv',
+            ]);
+    }
+
     public function test_movie_details_fall_back_to_local_catalog_without_tmdb_key(): void
     {
         Sanctum::actingAs(User::factory()->create());
         config(['services.tmdb.key' => null]);
 
-        $this->getJson('/api/movies/9001')
+        $this->getJson('/api/movies/9001?mediaType=movie')
             ->assertOk()
             ->assertJsonPath('data.title', 'Интерстеллар')
             ->assertJsonPath('data.runtime', 169)
             ->assertJsonPath('data.genres.0', 'научная фантастика');
+    }
+
+    public function test_tv_details_fall_back_to_local_catalog_without_tmdb_key(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+        config(['services.tmdb.key' => null]);
+
+        $this->getJson('/api/movies/9103?mediaType=tv')
+            ->assertOk()
+            ->assertJsonPath('data.title', 'Атака титанов')
+            ->assertJsonPath('data.mediaType', 'tv')
+            ->assertJsonPath('data.runtime', 24);
     }
 
     public function test_movie_recommendations_fall_back_to_local_catalog_without_tmdb_key(): void
@@ -67,10 +94,21 @@ class MovieApiTest extends TestCase
         Sanctum::actingAs(User::factory()->create());
         config(['services.tmdb.key' => null]);
 
-        $this->getJson('/api/movies/9001/recommendations?note=космос')
+        $this->getJson('/api/movies/9001/recommendations?mediaType=movie&note=космос')
             ->assertOk()
             ->assertJsonCount(8, 'data')
             ->assertJsonPath('data.0.title', 'Дюна');
+    }
+
+    public function test_tv_recommendations_fall_back_to_local_catalog_without_tmdb_key(): void
+    {
+        Sanctum::actingAs(User::factory()->create());
+        config(['services.tmdb.key' => null]);
+
+        $this->getJson('/api/movies/9103/recommendations?mediaType=tv&note=аниме')
+            ->assertOk()
+            ->assertJsonCount(8, 'data')
+            ->assertJsonPath('data.0.mediaType', 'tv');
     }
 
     public function test_recommendations_are_reranked_with_hugging_face_embeddings(): void

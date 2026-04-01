@@ -46,6 +46,7 @@ class WatchRoomController extends Controller
         $validated = $request->validate([
             'movie_title' => ['required', 'string', 'max:255'],
             'video_url' => ['required', 'url', 'max:2000'],
+            'media_type' => ['nullable', 'string', 'in:movie,tv'],
             'poster_path' => ['nullable', 'string', 'max:255'],
             'release_year' => ['nullable', 'integer', 'min:1888', 'max:2100'],
             'tmdb_id' => ['nullable', 'integer'],
@@ -56,6 +57,7 @@ class WatchRoomController extends Controller
             'host_user_id' => $user->id,
             'movie_title' => $validated['movie_title'],
             'video_url' => $validated['video_url'],
+            'media_type' => $validated['media_type'] ?? 'movie',
             'poster_path' => $validated['poster_path'] ?? null,
             'release_year' => $validated['release_year'] ?? null,
             'tmdb_id' => $validated['tmdb_id'] ?? null,
@@ -260,6 +262,7 @@ class WatchRoomController extends Controller
     {
         return [
             'code' => $room->code,
+            'mediaType' => $room->media_type ?: 'movie',
             'movieTitle' => $room->movie_title,
             'posterPath' => $room->poster_path,
             'posterUrl' => $this->tmdbService->imageUrl($room->poster_path),

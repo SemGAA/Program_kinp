@@ -18,6 +18,7 @@ class WatchRoomApiTest extends TestCase
 
         $createResponse = $this->postJson('/api/watch-rooms', [
             'tmdb_id' => 42,
+            'media_type' => 'tv',
             'movie_title' => 'Interstellar',
             'poster_path' => '/poster.jpg',
             'release_year' => 2014,
@@ -28,6 +29,7 @@ class WatchRoomApiTest extends TestCase
 
         $createResponse->assertCreated()
             ->assertJsonPath('data.movieTitle', 'Interstellar')
+            ->assertJsonPath('data.mediaType', 'tv')
             ->assertJsonPath('data.isHost', true)
             ->assertJsonPath('data.memberCount', 1)
             ->assertJsonPath('data.videoUrl', 'https://example.com/interstellar.mp4');

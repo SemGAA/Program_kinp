@@ -29,8 +29,12 @@ class MovieController extends Controller
 
     public function show(int $tmdbId): JsonResponse
     {
+        $validated = request()->validate([
+            'mediaType' => ['nullable', 'string', 'in:movie,tv'],
+        ]);
+
         return response()->json([
-            'data' => $this->tmdbService->getMovie($tmdbId),
+            'data' => $this->tmdbService->getMovie($tmdbId, $validated['mediaType'] ?? 'movie'),
         ]);
     }
 
@@ -38,10 +42,15 @@ class MovieController extends Controller
     {
         $validated = $request->validate([
             'note' => ['nullable', 'string', 'max:2000'],
+            'mediaType' => ['nullable', 'string', 'in:movie,tv'],
         ]);
 
         return response()->json([
-            'data' => $this->recommendationService->getForMovie($tmdbId, $validated['note'] ?? null),
+            'data' => $this->recommendationService->getForMovie(
+                $tmdbId,
+                $validated['note'] ?? null,
+                $validated['mediaType'] ?? 'movie',
+            ),
             'meta' => [
                 'aiEnabled' => filled($validated['note'] ?? null),
             ],

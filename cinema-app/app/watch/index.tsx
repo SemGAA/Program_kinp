@@ -161,7 +161,7 @@ export default function WatchRoomsScreen() {
             <View style={styles.roomCopy}>
               <Text style={styles.roomTitle}>{room.movieTitle}</Text>
               <Text style={sharedStyles.helperText}>
-                Код {room.code} • участников {room.memberCount}
+                {room.mediaType === 'tv' ? 'Сериал' : 'Фильм'} • код {room.code} • участников {room.memberCount}
               </Text>
               <Text style={sharedStyles.helperText}>
                 {room.isHost ? 'Вы хозяин комнаты' : `Хозяин: ${room.host?.name ?? 'неизвестно'}`}

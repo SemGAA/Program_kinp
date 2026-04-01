@@ -12,9 +12,9 @@ class RecommendationService
     ) {
     }
 
-    public function getForMovie(int $tmdbId, ?string $note = null): array
+    public function getForMovie(int $tmdbId, ?string $note = null, string $mediaType = 'movie'): array
     {
-        $recommendations = $this->tmdbService->getRecommendations($tmdbId);
+        $recommendations = $this->tmdbService->getRecommendations($tmdbId, $mediaType);
 
         if (blank($note) || count($recommendations) < 2 || ! $this->embeddingService->configured()) {
             return $recommendations;

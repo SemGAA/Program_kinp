@@ -24,7 +24,7 @@ import {
   updateNote,
 } from '@/lib/api';
 import { formatRuntime } from '@/lib/format';
-import type { MovieDetails, MovieRecommendation } from '@/types/app';
+import type { MediaType, MovieDetails, MovieRecommendation } from '@/types/app';
 
 const DEMO_VIDEO_URL = 'https://vjs.zencdn.net/v/oceans.mp4';
 
@@ -38,12 +38,14 @@ export default function MovieDetailsScreen() {
   const params = useLocalSearchParams<{
     fromName?: string;
     initialNote?: string;
+    mediaType?: MediaType;
     noteId?: string;
     sharedNote?: string;
     tmdbId: string;
   }>();
 
   const tmdbId = Number(readParam(params.tmdbId));
+  const mediaType = (readParam(params.mediaType) as MediaType | undefined) ?? 'movie';
   const incomingSharedNote = readParam(params.sharedNote);
   const incomingAuthor = readParam(params.fromName);
   const initialOwnNote = readParam(params.initialNote);
@@ -72,11 +74,14 @@ export default function MovieDetailsScreen() {
       setError(null);
 
       try {
-        const [moviePayload, notesPayload] = await Promise.all([getMovieDetails(tmdbId, token), getNotes(token)]);
+        const [moviePayload, notesPayload] = await Promise.all([
+          getMovieDetails(tmdbId, mediaType, token),
+          getNotes(token),
+        ]);
 
         const existingOwnNote =
           notesPayload.own.find((note) => note.id === initialNoteId) ??
-          notesPayload.own.find((note) => note.tmdbId === tmdbId);
+          notesPayload.own.find((note) => note.tmdbId === tmdbId && note.mediaType === mediaType);
 
         setMovie(moviePayload);
 
@@ -95,7 +100,7 @@ export default function MovieDetailsScreen() {
     };
 
     void loadMovie();
-  }, [initialNoteId, initialOwnNote, tmdbId, token]);
+  }, [initialNoteId, initialOwnNote, mediaType, tmdbId, token]);
 
   const handleSaveNote = async () => {
     if (!token || !movie) {
@@ -117,6 +122,7 @@ export default function MovieDetailsScreen() {
         const createdNote = await createNote(
           {
             tmdb_id: movie.id,
+            media_type: movie.mediaType,
             movie_title: movie.title,
             note_text: noteText.trim(),
             poster_path: movie.posterPath,
@@ -147,7 +153,12 @@ export default function MovieDetailsScreen() {
     setError(null);
 
     try {
-      const recommendationsPayload = await getMovieRecommendations(tmdbId, noteText.trim(), token);
+      const recommendationsPayload = await getMovieRecommendations(
+        tmdbId,
+        mediaType,
+        noteText.trim(),
+        token,
+      );
       setRecommendations(recommendationsPayload);
     } catch (caughtError) {
       const message =
@@ -175,6 +186,7 @@ export default function MovieDetailsScreen() {
       const room = await createWatchRoom(
         {
           movie_title: movie.title,
+          media_type: movie.mediaType,
           poster_path: movie.posterPath,
           release_year: movie.releaseYear,
           tmdb_id: movie.id,
@@ -208,8 +220,8 @@ export default function MovieDetailsScreen() {
 
   return (
     <AppShell
-      title={movie?.title ?? 'Карточка фильма'}
-      subtitle="Сохраняйте заметку, подбирайте рекомендации и открывайте комнату совместного просмотра.">
+      title={movie?.title ?? 'Карточка тайтла'}
+      subtitle="Сохраняйте заметку, подбирайте рекомендации и открывайте комнату совместного просмотра для любого найденного тайтла.">
       {isLoading ? (
         <View style={sharedStyles.card}>
           <ActivityIndicator color={AppColors.accent} />
@@ -229,6 +241,7 @@ export default function MovieDetailsScreen() {
             <View style={styles.heroCopy}>
               <Text style={styles.movieTitle}>{movie.title}</Text>
               <Text style={sharedStyles.helperText}>{movieMeta}</Text>
+              <Text style={sharedStyles.helperText}>{movie.mediaLabel}</Text>
               <View style={styles.genreRow}>
                 {movie.genres.map((genre) => (
                   <View key={genre} style={sharedStyles.chip}>
@@ -332,7 +345,8 @@ export default function MovieDetailsScreen() {
                 <View key={recommendation.id} style={[sharedStyles.card, styles.recommendationCard]}>
                   <Text style={styles.recommendationTitle}>{recommendation.title}</Text>
                   <Text style={sharedStyles.helperText}>
-                    {recommendation.releaseYear ? `${recommendation.releaseYear}` : 'Год не указан'}
+                    {recommendation.mediaLabel}
+                    {recommendation.releaseYear ? ` • ${recommendation.releaseYear}` : ' • год не указан'}
                     {recommendation.rating ? ` • рейтинг ${recommendation.rating.toFixed(1)}` : ''}
                   </Text>
                   <Text numberOfLines={4} style={sharedStyles.helperText}>

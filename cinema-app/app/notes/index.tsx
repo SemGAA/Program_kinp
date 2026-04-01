@@ -102,23 +102,25 @@ export default function NotesScreen() {
 
   const openOwnNote = (note: MovieNote) => {
     router.push({
-      pathname: '/movie/[tmdbId]',
-      params: {
-        tmdbId: String(note.tmdbId),
-        noteId: String(note.id),
-        initialNote: note.noteText,
-      },
+              pathname: '/movie/[tmdbId]',
+              params: {
+                tmdbId: String(note.tmdbId),
+                mediaType: note.mediaType,
+                noteId: String(note.id),
+                initialNote: note.noteText,
+              },
     });
   };
 
   const openIncomingNote = (note: MovieNote) => {
     router.push({
-      pathname: '/movie/[tmdbId]',
-      params: {
-        tmdbId: String(note.tmdbId),
-        sharedNote: note.noteText,
-        fromName: note.owner?.name ?? 'Друг',
-      },
+              pathname: '/movie/[tmdbId]',
+              params: {
+                tmdbId: String(note.tmdbId),
+                mediaType: note.mediaType,
+                sharedNote: note.noteText,
+                fromName: note.owner?.name ?? 'Друг',
+              },
     });
   };
 
@@ -163,7 +165,8 @@ export default function NotesScreen() {
               <View style={styles.noteHeading}>
                 <Text style={styles.movieTitle}>{note.movieTitle}</Text>
                 <Text style={sharedStyles.helperText}>
-                  {note.releaseYear ? `${note.releaseYear}` : 'Год не указан'}
+                  {(note.mediaType === 'tv' ? 'Сериал' : 'Фильм') +
+                    (note.releaseYear ? ` • ${note.releaseYear}` : ' • год не указан')}
                 </Text>
               </View>
               <View style={styles.statusBadge}>

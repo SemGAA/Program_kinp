@@ -47,6 +47,7 @@ class NoteController extends Controller
 
         $validated = $request->validate([
             'tmdb_id' => ['required', 'integer'],
+            'media_type' => ['nullable', 'string', 'in:movie,tv'],
             'movie_title' => ['required', 'string', 'max:255'],
             'poster_path' => ['nullable', 'string', 'max:255'],
             'release_year' => ['nullable', 'integer', 'min:1888', 'max:2100'],
@@ -56,6 +57,7 @@ class NoteController extends Controller
         $note = MovieNote::query()->create([
             'user_id' => $user->id,
             'tmdb_id' => $validated['tmdb_id'],
+            'media_type' => $validated['media_type'] ?? 'movie',
             'movie_title' => $validated['movie_title'],
             'poster_path' => $validated['poster_path'] ?? null,
             'release_year' => $validated['release_year'] ?? null,
@@ -197,6 +199,7 @@ class NoteController extends Controller
     {
         return [
             'id' => $note->id,
+            'mediaType' => $note->media_type ?: 'movie',
             'tmdbId' => $note->tmdb_id ?? $note->movie_id,
             'movieTitle' => $note->movie_title ?? $note->title,
             'posterPath' => $note->poster_path,

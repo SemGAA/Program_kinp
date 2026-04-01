@@ -12,7 +12,7 @@ export default function HomeScreen() {
   return (
     <AppShell
       title="Cinema Notes"
-      subtitle="Поиск фильмов, совместный просмотр по комнате и заметки прямо во время сеанса.">
+      subtitle="Поиск фильмов, сериалов, аниме и дорам, совместный просмотр по комнате и заметки прямо во время сеанса.">
       <View style={[sharedStyles.card, styles.heroCard]}>
         <View style={styles.heroHeader}>
           <View style={styles.heroCopy}>
@@ -44,7 +44,7 @@ export default function HomeScreen() {
         <Pressable onPress={() => router.push('/search')} style={[sharedStyles.card, styles.actionCard]}>
           <Text style={styles.actionTitle}>Найти фильм</Text>
           <Text style={sharedStyles.helperText}>
-            Поиск по TMDB, заметки по фильму и создание комнаты просмотра из карточки.
+            Поиск по каталогу фильмов, сериалов, дорам, аниме и мультсериалов, заметки и создание комнаты просмотра из карточки.
           </Text>
         </Pressable>
         <Pressable onPress={() => router.push('/watch')} style={[sharedStyles.card, styles.actionCard]}>
