@@ -3,6 +3,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   Share,
   StyleSheet,
@@ -16,11 +17,14 @@ import { AppColors } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import {
   ApiError,
+  getFriends,
   getWatchRoom,
+  inviteToWatchRoom,
   sendWatchRoomMessage,
   syncWatchRoomPlayback,
+  updateWatchRoomSource,
 } from '@/lib/api';
-import type { WatchPlayback, WatchRoom } from '@/types/app';
+import type { Friend, WatchPlayback, WatchRoom } from '@/types/app';
 
 function readParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
@@ -54,21 +58,26 @@ export default function WatchRoomScreen() {
   );
 
   const [room, setRoom] = useState<WatchRoom | null>(initialRoom);
+  const [friends, setFriends] = useState<Friend[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(!initialRoom);
   const [messageBody, setMessageBody] = useState('');
   const [messageKind, setMessageKind] = useState<'chat' | 'note'>('chat');
+  const [sourceUrl, setSourceUrl] = useState(initialRoom?.videoUrl ?? '');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isOpeningFullscreen, setIsOpeningFullscreen] = useState(false);
+  const [isSavingSource, setIsSavingSource] = useState(false);
+  const [invitingFriendId, setInvitingFriendId] = useState<number | null>(null);
 
   const loadRoom = useCallback(async () => {
     if (!token || !code) {
-      return;
+      return null;
     }
 
     try {
       const payload = await getWatchRoom(code, token);
       setRoom(payload);
+      setSourceUrl(payload.videoUrl ?? '');
       setError(null);
       return payload;
     } catch (caughtError) {
@@ -79,55 +88,66 @@ export default function WatchRoomScreen() {
     }
   }, [code, token]);
 
-  const applyRemotePlayback = useCallback(
-    async (nextRoom: WatchRoom | null) => {
-      if (!videoRef.current || !nextRoom || nextRoom.isHost) {
+  const loadFriends = useCallback(async () => {
+    if (!token || !room?.isHost) {
+      setFriends([]);
+      return;
+    }
+
+    try {
+      const payload = await getFriends(token);
+      setFriends(payload);
+    } catch {
+      // Ignore invite helper failures to keep the room responsive.
+    }
+  }, [room?.isHost, token]);
+
+  const applyRemotePlayback = useCallback(async (nextRoom: WatchRoom | null) => {
+    if (!videoRef.current || !nextRoom || nextRoom.isHost || !nextRoom.videoUrl) {
+      return;
+    }
+
+    applyingRemoteRef.current = true;
+
+    try {
+      const status = await videoRef.current.getStatusAsync();
+      if (!status.isLoaded) {
         return;
       }
 
-      applyingRemoteRef.current = true;
-
-      try {
-        const status = await videoRef.current.getStatusAsync();
-
-        if (!status.isLoaded) {
-          return;
-        }
-
-        const positionDelta = Math.abs((status.positionMillis ?? 0) - nextRoom.playback.positionMs);
-
-        if (positionDelta > 1800) {
-          await videoRef.current.setPositionAsync(nextRoom.playback.positionMs);
-        }
-
-        if (nextRoom.playback.state === 'playing' && !status.isPlaying) {
-          await videoRef.current.playAsync();
-        }
-
-        if (
-          (nextRoom.playback.state === 'paused' || nextRoom.playback.state === 'ended') &&
-          status.isPlaying
-        ) {
-          await videoRef.current.pauseAsync();
-        }
-      } finally {
-        setTimeout(() => {
-          applyingRemoteRef.current = false;
-        }, 250);
+      const positionDelta = Math.abs((status.positionMillis ?? 0) - nextRoom.playback.positionMs);
+      if (positionDelta > 1800) {
+        await videoRef.current.setPositionAsync(nextRoom.playback.positionMs);
       }
-    },
-    [],
-  );
+
+      if (nextRoom.playback.state === 'playing' && !status.isPlaying) {
+        await videoRef.current.playAsync();
+      }
+
+      if (
+        (nextRoom.playback.state === 'paused' || nextRoom.playback.state === 'ended') &&
+        status.isPlaying
+      ) {
+        await videoRef.current.pauseAsync();
+      }
+    } finally {
+      setTimeout(() => {
+        applyingRemoteRef.current = false;
+      }, 250);
+    }
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
 
     const bootstrap = async () => {
       const payload = await loadRoom();
-
-      if (isMounted && payload) {
-        void applyRemotePlayback(payload);
+      if (!isMounted || !payload) {
+        return;
       }
+
+      await loadFriends();
+      void applyRemotePlayback(payload);
     };
 
     void bootstrap();
@@ -144,11 +164,11 @@ export default function WatchRoomScreen() {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [applyRemotePlayback, loadRoom]);
+  }, [applyRemotePlayback, loadFriends, loadRoom]);
 
   const handlePlaybackStatusUpdate = useCallback(
     (status: AVPlaybackStatus) => {
-      if (!status.isLoaded || !token || !room?.isHost || applyingRemoteRef.current) {
+      if (!status.isLoaded || !token || !room?.isHost || !room.videoUrl || applyingRemoteRef.current) {
         return;
       }
 
@@ -235,7 +255,7 @@ export default function WatchRoomScreen() {
   };
 
   const handleOpenFullscreen = async () => {
-    if (!videoRef.current) {
+    if (!videoRef.current || !room?.videoUrl) {
       return;
     }
 
@@ -250,6 +270,48 @@ export default function WatchRoomScreen() {
     }
   };
 
+  const handleSaveSource = async () => {
+    if (!token || !room || !room.isHost) {
+      return;
+    }
+
+    if (!sourceUrl.trim()) {
+      Alert.alert('Нужна ссылка', 'Вставьте прямую ссылку на mp4 или m3u8.');
+      return;
+    }
+
+    setIsSavingSource(true);
+    setError(null);
+
+    try {
+      const updatedRoom = await updateWatchRoomSource(room.code, sourceUrl.trim(), token);
+      setRoom(updatedRoom);
+      setSourceUrl(updatedRoom.videoUrl ?? '');
+    } catch (caughtError) {
+      setError(caughtError instanceof ApiError ? caughtError.message : 'Не удалось сохранить источник видео.');
+    } finally {
+      setIsSavingSource(false);
+    }
+  };
+
+  const handleInviteFriend = async (friendId: number) => {
+    if (!token || !room) {
+      return;
+    }
+
+    setInvitingFriendId(friendId);
+    setError(null);
+
+    try {
+      await inviteToWatchRoom(room.code, friendId, token);
+      Alert.alert('Готово', 'Приглашение отправлено.');
+    } catch (caughtError) {
+      setError(caughtError instanceof ApiError ? caughtError.message : 'Не удалось отправить приглашение.');
+    } finally {
+      setInvitingFriendId(null);
+    }
+  };
+
   const sortedMessages = useMemo(() => room?.messages ?? [], [room?.messages]);
 
   return (
@@ -257,7 +319,7 @@ export default function WatchRoomScreen() {
       title={room?.movieTitle ?? 'Комната просмотра'}
       subtitle={
         room
-          ? `Код ${room.code}. ${room.isHost ? 'Вы управляете воспроизведением.' : 'Управляет хозяин комнаты.'}`
+          ? `Код ${room.code}. ${room.isHost ? 'Вы управляете комнатой.' : 'Вы в комнате друга.'}`
           : 'Загрузка комнаты...'
       }>
       {isLoading ? (
@@ -284,30 +346,92 @@ export default function WatchRoomScreen() {
             <Text style={sharedStyles.helperText}>
               Хозяин: {room.host?.name ?? 'неизвестно'} • участников: {room.memberCount}
             </Text>
-            <Video
-              ref={videoRef}
-              source={{ uri: room.videoUrl }}
-              resizeMode={ResizeMode.CONTAIN}
-              shouldPlay={room.isHost ? false : room.playback.state === 'playing'}
-              style={styles.video}
-              useNativeControls={room.isHost}
-              onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
-            />
-            <View style={styles.videoActionRow}>
-              <Pressable onPress={() => void handleOpenFullscreen()} style={sharedStyles.secondaryButton}>
-                {isOpeningFullscreen ? (
-                  <ActivityIndicator color={AppColors.textPrimary} />
-                ) : (
-                  <Text style={sharedStyles.secondaryButtonText}>На весь экран</Text>
-                )}
-              </Pressable>
-            </View>
+
+            {room.videoUrl ? (
+              <>
+                <Video
+                  ref={videoRef}
+                  source={{ uri: room.videoUrl }}
+                  resizeMode={ResizeMode.CONTAIN}
+                  shouldPlay={room.isHost ? false : room.playback.state === 'playing'}
+                  style={styles.video}
+                  useNativeControls={room.isHost}
+                  onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
+                />
+                <View style={styles.videoActionRow}>
+                  <Pressable onPress={() => void handleOpenFullscreen()} style={sharedStyles.secondaryButton}>
+                    {isOpeningFullscreen ? (
+                      <ActivityIndicator color={AppColors.textPrimary} />
+                    ) : (
+                      <Text style={sharedStyles.secondaryButtonText}>На весь экран</Text>
+                    )}
+                  </Pressable>
+                </View>
+              </>
+            ) : (
+              <View style={[styles.video, styles.videoPlaceholder]}>
+                <Text style={styles.placeholderTitle}>Комната создана</Text>
+                <Text style={sharedStyles.helperText}>
+                  Источник видео пока не добавлен. Можно пригласить друга уже сейчас и подключить источник позже.
+                </Text>
+              </View>
+            )}
+
             <Text style={sharedStyles.helperText}>
               {room.isHost
-                ? 'Вы хозяин комнаты: используйте стандартные кнопки плеера для play/pause/seek.'
-                : 'Вы зритель: плеер синхронизируется по состоянию хозяина комнаты.'}
+                ? 'Управление воспроизведением остаётся у хозяина комнаты.'
+                : 'Воспроизведение синхронизируется по состоянию комнаты.'}
             </Text>
           </View>
+
+          {room.isHost ? (
+            <View style={[sharedStyles.card, styles.hostToolsCard]}>
+              <Text style={styles.sectionTitle}>Позвать друга</Text>
+              {friends.length > 0 ? (
+                <View style={styles.friendList}>
+                  {friends.slice(0, 6).map((friend) => (
+                    <Pressable
+                      key={friend.id}
+                      onPress={() => void handleInviteFriend(friend.id)}
+                      style={styles.friendInviteButton}>
+                      {invitingFriendId === friend.id ? (
+                        <ActivityIndicator color={AppColors.textPrimary} />
+                      ) : (
+                        <Text style={styles.friendInviteText}>{friend.name}</Text>
+                      )}
+                    </Pressable>
+                  ))}
+                </View>
+              ) : (
+                <Text style={sharedStyles.helperText}>
+                  Пока нет друзей. Добавьте друга на вкладке друзей, и приглашения будут приходить прямо в приложении.
+                </Text>
+              )}
+
+              {!room.videoUrl ? (
+                <>
+                  <Text style={styles.sectionSubtitle}>Источник видео</Text>
+                  <TextInput
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="url"
+                    onChangeText={setSourceUrl}
+                    placeholder="https://example.com/video.m3u8"
+                    placeholderTextColor={AppColors.textSecondary}
+                    style={sharedStyles.input}
+                    value={sourceUrl}
+                  />
+                  <Pressable onPress={() => void handleSaveSource()} style={sharedStyles.secondaryButton}>
+                    {isSavingSource ? (
+                      <ActivityIndicator color={AppColors.textPrimary} />
+                    ) : (
+                      <Text style={sharedStyles.secondaryButtonText}>Сохранить источник</Text>
+                    )}
+                  </Pressable>
+                </>
+              ) : null}
+            </View>
+          ) : null}
 
           <View style={[sharedStyles.card, styles.membersCard]}>
             <Text style={styles.sectionTitle}>Участники</Text>
@@ -330,22 +454,18 @@ export default function WatchRoomScreen() {
               <Pressable
                 onPress={() => setMessageKind('chat')}
                 style={[styles.kindButton, messageKind === 'chat' && styles.kindButtonActive]}>
-                <Text style={[styles.kindText, messageKind === 'chat' && styles.kindTextActive]}>
-                  Сообщение
-                </Text>
+                <Text style={[styles.kindText, messageKind === 'chat' && styles.kindTextActive]}>Сообщение</Text>
               </Pressable>
               <Pressable
                 onPress={() => setMessageKind('note')}
                 style={[styles.kindButton, messageKind === 'note' && styles.kindButtonActive]}>
-                <Text style={[styles.kindText, messageKind === 'note' && styles.kindTextActive]}>
-                  Заметка
-                </Text>
+                <Text style={[styles.kindText, messageKind === 'note' && styles.kindTextActive]}>Заметка</Text>
               </Pressable>
             </View>
             <TextInput
               multiline
               onChangeText={setMessageBody}
-              placeholder="Напишите сообщение или заметку по фильму"
+              placeholder="Напишите сообщение или заметку по тайтлу"
               placeholderTextColor={AppColors.textSecondary}
               style={[sharedStyles.input, styles.messageInput]}
               textAlignVertical="top"
@@ -408,7 +528,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
+  friendInviteButton: {
+    alignItems: 'center',
+    backgroundColor: AppColors.cardMuted,
+    borderColor: AppColors.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    minWidth: 96,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  friendInviteText: {
+    color: AppColors.textPrimary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  friendList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
   heroCard: {
+    gap: 12,
+  },
+  hostToolsCard: {
     gap: 12,
   },
   kindButton: {
@@ -485,6 +628,11 @@ const styles = StyleSheet.create({
   messagesBlock: {
     gap: 12,
   },
+  placeholderTitle: {
+    color: AppColors.textPrimary,
+    fontSize: 18,
+    fontWeight: '700',
+  },
   roomCode: {
     color: AppColors.textPrimary,
     fontSize: 18,
@@ -494,6 +642,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
+  },
+  sectionSubtitle: {
+    color: AppColors.textSecondary,
+    fontSize: 14,
+    fontWeight: '700',
   },
   sectionTitle: {
     color: AppColors.textPrimary,
@@ -522,5 +675,11 @@ const styles = StyleSheet.create({
   },
   videoActionRow: {
     alignItems: 'flex-start',
+  },
+  videoPlaceholder: {
+    alignItems: 'center',
+    gap: 12,
+    justifyContent: 'center',
+    paddingHorizontal: 20,
   },
 });

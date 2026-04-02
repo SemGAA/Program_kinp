@@ -121,5 +121,20 @@ export type WatchRoom = WatchRoomSummary & {
   members: Array<PersonPreview & { lastSeenAt: string | null }>;
   messages: WatchRoomMessage[];
   tmdbId: number | null;
-  videoUrl: string;
+  videoUrl: string | null;
+};
+
+export type WatchRoomInvite = {
+  id: number;
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: string | null;
+  respondedAt: string | null;
+  room: WatchRoomSummary;
+  sender: PersonPreview | null;
+  recipient: PersonPreview | null;
+};
+
+export type WatchRoomInvitesPayload = {
+  incoming: WatchRoomInvite[];
+  outgoing: WatchRoomInvite[];
 };

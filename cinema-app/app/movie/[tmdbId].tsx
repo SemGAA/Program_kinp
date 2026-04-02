@@ -18,15 +18,15 @@ import {
   ApiError,
   createNote,
   createWatchRoom,
+  getFriends,
   getMatchedNote,
   getMovieDetails,
   getMovieRecommendations,
+  inviteToWatchRoom,
   updateNote,
 } from '@/lib/api';
 import { formatRuntime } from '@/lib/format';
-import type { MediaType, MovieDetails, MovieRecommendation } from '@/types/app';
-
-const DEMO_VIDEO_URL = 'https://vjs.zencdn.net/v/oceans.mp4';
+import type { Friend, MediaType, MovieDetails, MovieRecommendation } from '@/types/app';
 
 function readParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
@@ -96,14 +96,16 @@ export default function MovieDetailsScreen() {
   const [movie, setMovie] = useState<MovieDetails | null>(initialMovie);
   const [noteId, setNoteId] = useState<number | null>(initialNoteId);
   const [noteText, setNoteText] = useState(initialOwnNote ?? '');
-  const [videoUrl, setVideoUrl] = useState('');
   const [recommendations, setRecommendations] = useState<MovieRecommendation[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(!initialMovie);
   const [isSaving, setIsSaving] = useState(false);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
+  const [invitingFriendId, setInvitingFriendId] = useState<number | null>(null);
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
   const [isLoadingNoteState, setIsLoadingNoteState] = useState(false);
+  const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
+  const [friends, setFriends] = useState<Friend[]>([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -171,8 +173,26 @@ export default function MovieDetailsScreen() {
       }
     };
 
+    const loadFriends = async () => {
+      if (!token) {
+        return;
+      }
+
+      try {
+        const payload = await getFriends(token);
+        if (!isMounted) {
+          return;
+        }
+
+        setFriends(payload);
+      } catch {
+        // Friend shortcuts should not block the title card.
+      }
+    };
+
     void loadMovie();
     void loadOwnNote();
+    void loadFriends();
 
     return () => {
       isMounted = false;
@@ -249,11 +269,6 @@ export default function MovieDetailsScreen() {
       return;
     }
 
-    if (!videoUrl.trim()) {
-      Alert.alert('Нужна ссылка', 'Вставьте прямую ссылку на видео формата mp4 или m3u8.');
-      return;
-    }
-
     setIsCreatingRoom(true);
     setError(null);
 
@@ -265,7 +280,6 @@ export default function MovieDetailsScreen() {
           poster_path: movie.posterPath,
           release_year: movie.releaseYear,
           tmdb_id: movie.id,
-          video_url: videoUrl.trim(),
         },
         token,
       );
@@ -282,6 +296,46 @@ export default function MovieDetailsScreen() {
       setError(message);
     } finally {
       setIsCreatingRoom(false);
+    }
+  };
+
+  const handleCreateAndInvite = async (friend: Friend) => {
+    if (!token || !movie) {
+      return;
+    }
+
+    setInvitingFriendId(friend.id);
+    setError(null);
+
+    try {
+      const room = await createWatchRoom(
+        {
+          movie_title: movie.title,
+          media_type: movie.mediaType,
+          poster_path: movie.posterPath,
+          release_year: movie.releaseYear,
+          tmdb_id: movie.id,
+        },
+        token,
+      );
+
+      await inviteToWatchRoom(room.code, friend.id, token);
+
+      router.push({
+        pathname: '/watch/[code]',
+        params: {
+          code: room.code,
+          initialRoom: JSON.stringify(room),
+        },
+      });
+    } catch (caughtError) {
+      const message =
+        caughtError instanceof ApiError
+          ? caughtError.message
+          : '\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0441\u043e\u0437\u0434\u0430\u0442\u044c \u043a\u043e\u043c\u043d\u0430\u0442\u0443 \u0438 \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u043f\u0440\u0438\u0433\u043b\u0430\u0448\u0435\u043d\u0438\u0435.';
+      setError(message);
+    } finally {
+      setInvitingFriendId(null);
     }
   };
 
@@ -330,9 +384,20 @@ export default function MovieDetailsScreen() {
                   </View>
                 ))}
               </View>
-              <Text style={sharedStyles.helperText}>
-                {movie.overview || 'Описание для этого тайтла отсутствует.'}
+              <Text
+                numberOfLines={isOverviewExpanded ? undefined : 3}
+                style={sharedStyles.helperText}>
+                {movie.overview || '\u041e\u043f\u0438\u0441\u0430\u043d\u0438\u0435 \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u043e.'}
               </Text>
+              {movie.overview ? (
+                <Pressable
+                  onPress={() => setIsOverviewExpanded((currentValue) => !currentValue)}
+                  style={styles.inlineButton}>
+                  <Text style={styles.inlineButtonText}>
+                    {isOverviewExpanded ? '\u0421\u043a\u0440\u044b\u0442\u044c' : '\u0427\u0438\u0442\u0430\u0442\u044c \u043f\u043e\u043b\u043d\u043e\u0441\u0442\u044c\u044e'}
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
           </View>
 
@@ -390,36 +455,48 @@ export default function MovieDetailsScreen() {
           </View>
 
           <View style={[sharedStyles.card, styles.roomCard]}>
-            <Text style={styles.sectionTitle}>Комната совместного просмотра</Text>
-            <Text style={sharedStyles.helperText}>
-              Вставьте прямую ссылку на видео. Для быстрого теста можно подставить демо-видео.
+            <Text style={styles.sectionTitle}>
+              {'\u041a\u043e\u043c\u043d\u0430\u0442\u0430 \u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u0430'}
             </Text>
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              onChangeText={setVideoUrl}
-              placeholder="https://example.com/video.mp4"
-              placeholderTextColor={AppColors.textSecondary}
-              style={sharedStyles.input}
-              value={videoUrl}
-            />
-            <View style={styles.actionRow}>
-              <Pressable
-                onPress={() => setVideoUrl(DEMO_VIDEO_URL)}
-                style={[sharedStyles.secondaryButton, styles.flexButton]}>
-                <Text style={sharedStyles.secondaryButtonText}>Подставить демо</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => void handleCreateRoom()}
-                style={[sharedStyles.primaryButton, styles.flexButton]}>
-                {isCreatingRoom ? (
-                  <ActivityIndicator color={AppColors.textPrimary} />
-                ) : (
-                  <Text style={sharedStyles.primaryButtonText}>Создать комнату</Text>
-                )}
-              </Pressable>
-            </View>
+            <Text style={sharedStyles.helperText}>
+              {
+                '\u041a\u043e\u043c\u043d\u0430\u0442\u0430 \u0441\u043e\u0437\u0434\u0430\u0441\u0442\u0441\u044f \u0441\u0440\u0430\u0437\u0443. \u0414\u0440\u0443\u0433\u0430 \u043c\u043e\u0436\u043d\u043e \u043f\u043e\u0437\u0432\u0430\u0442\u044c \u0443\u0436\u0435 \u0432\u043d\u0443\u0442\u0440\u0438 \u043a\u043e\u043c\u043d\u0430\u0442\u044b. \u0418\u0441\u0442\u043e\u0447\u043d\u0438\u043a \u0432\u0438\u0434\u0435\u043e \u043c\u043e\u0436\u043d\u043e \u0434\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043f\u043e\u0437\u0436\u0435, \u0435\u0441\u043b\u0438 \u043e\u043d \u0435\u0441\u0442\u044c.'
+              }
+            </Text>
+            <Pressable
+              onPress={() => void handleCreateRoom()}
+              style={sharedStyles.primaryButton}>
+              {isCreatingRoom ? (
+                <ActivityIndicator color={AppColors.textPrimary} />
+              ) : (
+                <Text style={sharedStyles.primaryButtonText}>
+                  {'\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u043a\u043e\u043c\u043d\u0430\u0442\u0443'}
+                </Text>
+              )}
+            </Pressable>
+            {friends.length > 0 ? (
+              <View style={styles.quickInviteBlock}>
+                <Text style={sharedStyles.helperText}>
+                  {
+                    '\u0418\u043b\u0438 \u0441\u0440\u0430\u0437\u0443 \u0441\u043e\u0437\u0434\u0430\u0439\u0442\u0435 \u043a\u043e\u043c\u043d\u0430\u0442\u0443 \u0438 \u043f\u043e\u0437\u043e\u0432\u0438\u0442\u0435 \u0434\u0440\u0443\u0433\u0430:'
+                  }
+                </Text>
+                <View style={styles.quickInviteRow}>
+                  {friends.slice(0, 4).map((friend) => (
+                    <Pressable
+                      key={friend.id}
+                      onPress={() => void handleCreateAndInvite(friend)}
+                      style={styles.quickInviteButton}>
+                      {invitingFriendId === friend.id ? (
+                        <ActivityIndicator color={AppColors.textPrimary} />
+                      ) : (
+                        <Text style={styles.quickInviteText}>{friend.name}</Text>
+                      )}
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            ) : null}
           </View>
 
           {recommendations.length > 0 ? (
@@ -458,6 +535,15 @@ export default function MovieDetailsScreen() {
 }
 
 const styles = StyleSheet.create({
+  inlineButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+  },
+  inlineButtonText: {
+    color: AppColors.accent,
+    fontSize: 13,
+    fontWeight: '700',
+  },
   actionRow: {
     flexDirection: 'row',
     gap: 10,
@@ -506,6 +592,29 @@ const styles = StyleSheet.create({
   },
   recommendationsBlock: {
     gap: 12,
+  },
+  quickInviteBlock: {
+    gap: 10,
+  },
+  quickInviteButton: {
+    alignItems: 'center',
+    backgroundColor: AppColors.cardMuted,
+    borderColor: AppColors.border,
+    borderRadius: 14,
+    borderWidth: 1,
+    minWidth: 92,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  quickInviteRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  quickInviteText: {
+    color: AppColors.textPrimary,
+    fontSize: 13,
+    fontWeight: '700',
   },
   recommendationTitle: {
     color: AppColors.textPrimary,

@@ -19,6 +19,8 @@ import type {
   NotesPayload,
   WatchPlayback,
   WatchRoom,
+  WatchRoomInvite,
+  WatchRoomInvitesPayload,
   WatchRoomMessage,
   WatchRoomSummary,
 } from '@/types/app';
@@ -371,7 +373,7 @@ export async function createWatchRoom(
     poster_path?: string | null;
     release_year?: number | null;
     tmdb_id?: number | null;
-    video_url: string;
+    video_url?: string;
   },
   token: string,
 ) {
@@ -398,6 +400,19 @@ export async function getWatchRoom(code: string, token: string) {
   const response = await request<{ data: WatchRoom }>(`/watch-rooms/${encodeURIComponent(code)}`, {
     token,
   });
+
+  return response.data;
+}
+
+export async function updateWatchRoomSource(code: string, videoUrl: string, token: string) {
+  const response = await request<{ data: WatchRoom }>(
+    `/watch-rooms/${encodeURIComponent(code)}/source`,
+    {
+      body: { video_url: videoUrl },
+      method: 'PATCH',
+      token,
+    },
+  );
 
   return response.data;
 }
@@ -441,6 +456,39 @@ export async function sendWatchRoomMessage(
   );
 
   return response.data;
+}
+
+export async function getWatchRoomInvites(token: string) {
+  return request<WatchRoomInvitesPayload>('/watch-room-invites', { token });
+}
+
+export async function inviteToWatchRoom(code: string, recipientId: number, token: string) {
+  const response = await request<{ data: WatchRoomInvite }>(
+    `/watch-rooms/${encodeURIComponent(code)}/invite`,
+    {
+      body: { recipient_id: recipientId },
+      method: 'POST',
+      token,
+    },
+  );
+
+  return response.data;
+}
+
+export async function acceptWatchRoomInvite(inviteId: number, token: string) {
+  const response = await request<{ data: WatchRoom }>(`/watch-room-invites/${inviteId}/accept`, {
+    method: 'POST',
+    token,
+  });
+
+  return response.data;
+}
+
+export async function rejectWatchRoomInvite(inviteId: number, token: string) {
+  return request<{ message: string }>(`/watch-room-invites/${inviteId}/reject`, {
+    method: 'POST',
+    token,
+  });
 }
 
 export { ApiConnectionError, ApiError };

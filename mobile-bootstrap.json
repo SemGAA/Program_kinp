@@ -1,7 +1,7 @@
 ﻿{
-  "apiBaseUrl": "http://192.168.0.102:8000/api",
-  "lanApiBaseUrl": "http://192.168.0.102:8000/api",
-  "publicApiBaseUrl": null,
-  "source": "lan-fallback",
-  "updatedAt": "2026-04-01T21:05:00.000Z"
+  "apiBaseUrl": "https://cinema-notes-api.semgacinema20260402.workers.dev/api",
+  "lanApiBaseUrl": null,
+  "publicApiBaseUrl": "https://cinema-notes-api.semgacinema20260402.workers.dev/api",
+  "source": "cloudflare-workers",
+  "updatedAt": "2026-04-02T12:20:00.000Z"
 }

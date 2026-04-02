@@ -136,6 +136,10 @@ async function handleRequest(request, env) {
     return json({ data: await listWatchRooms(env, auth.user.id) });
   }
 
+  if (pathname === '/api/watch-room-invites' && request.method === 'GET') {
+    return json(await listWatchRoomInvites(env, auth.user.id));
+  }
+
   if (pathname === '/api/watch-rooms' && request.method === 'POST') {
     return handleCreateWatchRoom(request, env, auth.user);
   }
@@ -149,6 +153,16 @@ async function handleRequest(request, env) {
     return handleShowWatchRoom(env, auth.user, watchShowMatch[1]);
   }
 
+  const watchInviteMatch = pathname.match(/^\/api\/watch-rooms\/([A-Za-z0-9_-]+)\/invite$/);
+  if (watchInviteMatch && request.method === 'POST') {
+    return handleCreateWatchRoomInvite(request, env, auth.user, watchInviteMatch[1]);
+  }
+
+  const watchSourceMatch = pathname.match(/^\/api\/watch-rooms\/([A-Za-z0-9_-]+)\/source$/);
+  if (watchSourceMatch && request.method === 'PATCH') {
+    return handleUpdateWatchRoomSource(request, env, auth.user, watchSourceMatch[1]);
+  }
+
   const watchSyncMatch = pathname.match(/^\/api\/watch-rooms\/([A-Za-z0-9_-]+)\/sync$/);
   if (watchSyncMatch && request.method === 'POST') {
     return handleSyncWatchRoom(request, env, auth.user, watchSyncMatch[1]);
@@ -157,6 +171,16 @@ async function handleRequest(request, env) {
   const watchMessageMatch = pathname.match(/^\/api\/watch-rooms\/([A-Za-z0-9_-]+)\/messages$/);
   if (watchMessageMatch && request.method === 'POST') {
     return handleWatchRoomMessage(request, env, auth.user, watchMessageMatch[1]);
+  }
+
+  const watchInviteAcceptMatch = pathname.match(/^\/api\/watch-room-invites\/(\d+)\/accept$/);
+  if (watchInviteAcceptMatch && request.method === 'POST') {
+    return handleAcceptWatchRoomInvite(env, auth.user, Number(watchInviteAcceptMatch[1]));
+  }
+
+  const watchInviteRejectMatch = pathname.match(/^\/api\/watch-room-invites\/(\d+)\/reject$/);
+  if (watchInviteRejectMatch && request.method === 'POST') {
+    return handleRejectWatchRoomInvite(env, auth.user, Number(watchInviteRejectMatch[1]));
   }
 
   if (pathname === '/api/movies/search' && request.method === 'GET') {
@@ -602,17 +626,16 @@ async function handleCreateWatchRoom(request, env, currentUser) {
   const movieTitle = String(body.movie_title || '').trim();
   const videoUrl = String(body.video_url || '').trim();
 
-  if (!movieTitle || !videoUrl) {
+  if (!movieTitle) {
     return validationError({
-      message: 'Movie title and video URL are required.',
+      message: 'Movie title is required.',
       errors: {
         movie_title: !movieTitle ? ['Movie title is required.'] : undefined,
-        video_url: !videoUrl ? ['Video URL is required.'] : undefined,
       },
     });
   }
 
-  if (!isValidUrl(videoUrl)) {
+  if (videoUrl && !isValidUrl(videoUrl)) {
     return validationError({
       message: 'Video URL must be a valid URL.',
       errors: {
@@ -631,7 +654,7 @@ async function handleCreateWatchRoom(request, env, currentUser) {
       code,
       currentUser.id,
       movieTitle,
-      videoUrl,
+      videoUrl || '',
       mediaType,
       body.poster_path ? String(body.poster_path) : null,
       body.release_year ? Number(body.release_year) : null,
@@ -649,6 +672,40 @@ async function handleCreateWatchRoom(request, env, currentUser) {
   const roomId = Number(insert.meta.last_row_id);
   await upsertRoomMember(env, roomId, currentUser.id);
   return json({ data: await formatWatchRoom(env, roomId, currentUser.id) }, 201);
+}
+
+async function handleUpdateWatchRoomSource(request, env, currentUser, code) {
+  const room = await first(env.DB, 'SELECT * FROM watch_rooms WHERE code = ?', [String(code).trim().toUpperCase()]);
+  if (!room) {
+    return json({ message: 'Room not found.' }, 404);
+  }
+
+  if (Number(room.host_user_id) !== Number(currentUser.id)) {
+    return json({ message: 'Only the host can update the source.' }, 403);
+  }
+
+  const body = await parseJson(request);
+  if (body instanceof Response) {
+    return body;
+  }
+
+  const videoUrl = String(body.video_url || '').trim();
+  if (!videoUrl || !isValidUrl(videoUrl)) {
+    return validationError({
+      message: 'Video URL must be a valid URL.',
+      errors: {
+        video_url: ['Video URL must be a valid URL.'],
+      },
+    });
+  }
+
+  await run(env.DB, 'UPDATE watch_rooms SET video_url = ?, updated_at = ? WHERE id = ?', [
+    videoUrl,
+    nowIso(),
+    room.id,
+  ]);
+
+  return json({ data: await formatWatchRoom(env, room.id, currentUser.id) });
 }
 
 async function handleJoinWatchRoom(request, env, currentUser) {
@@ -674,6 +731,80 @@ async function handleJoinWatchRoom(request, env, currentUser) {
 
   await upsertRoomMember(env, room.id, currentUser.id);
   return json({ data: await formatWatchRoom(env, room.id, currentUser.id) });
+}
+
+async function handleCreateWatchRoomInvite(request, env, currentUser, code) {
+  const room = await first(env.DB, 'SELECT * FROM watch_rooms WHERE code = ?', [String(code).trim().toUpperCase()]);
+  if (!room) {
+    return json({ message: 'Room not found.' }, 404);
+  }
+
+  if (Number(room.host_user_id) !== Number(currentUser.id)) {
+    return json({ message: 'Only the host can invite friends.' }, 403);
+  }
+
+  const body = await parseJson(request);
+  if (body instanceof Response) {
+    return body;
+  }
+
+  const recipientId = Number(body.recipient_id);
+  if (!Number.isFinite(recipientId)) {
+    return validationError({
+      message: 'recipient_id is required.',
+      errors: {
+        recipient_id: ['recipient_id is required.'],
+      },
+    });
+  }
+
+  if (Number(recipientId) === Number(currentUser.id)) {
+    return json({ message: 'You cannot invite yourself.' }, 422);
+  }
+
+  const recipient = await getUserById(env, recipientId);
+  if (!recipient) {
+    return json({ message: 'Friend not found.' }, 404);
+  }
+
+  const friends = await usersAreFriends(env, currentUser.id, recipientId);
+  if (!friends) {
+    return json({ message: 'You can only invite confirmed friends.' }, 403);
+  }
+
+  const existing = await first(
+    env.DB,
+    'SELECT * FROM watch_room_invites WHERE watch_room_id = ? AND recipient_user_id = ?',
+    [room.id, recipientId],
+  );
+
+  if (existing?.status === 'pending') {
+    return json({ message: 'Invite already sent.' }, 422);
+  }
+
+  const timestamp = nowIso();
+
+  if (existing) {
+    await run(
+      env.DB,
+      'UPDATE watch_room_invites SET sender_user_id = ?, status = ?, responded_at = NULL, updated_at = ? WHERE id = ?',
+      [currentUser.id, 'pending', timestamp, existing.id],
+    );
+  } else {
+    await run(
+      env.DB,
+      'INSERT INTO watch_room_invites (watch_room_id, sender_user_id, recipient_user_id, status, created_at, responded_at, updated_at) VALUES (?, ?, ?, ?, ?, NULL, ?)',
+      [room.id, currentUser.id, recipientId, 'pending', timestamp, timestamp],
+    );
+  }
+
+  const invite = await first(
+    env.DB,
+    'SELECT * FROM watch_room_invites WHERE watch_room_id = ? AND recipient_user_id = ?',
+    [room.id, recipientId],
+  );
+
+  return json({ data: await formatWatchRoomInvite(env, invite, currentUser.id) }, existing ? 200 : 201);
 }
 
 async function handleShowWatchRoom(env, currentUser, code) {
@@ -758,6 +889,53 @@ async function handleWatchRoomMessage(request, env, currentUser, code) {
   return json({ data: await formatRoomMessage(env, message) }, 201);
 }
 
+async function handleAcceptWatchRoomInvite(env, currentUser, inviteId) {
+  const invite = await first(env.DB, 'SELECT * FROM watch_room_invites WHERE id = ?', [inviteId]);
+  if (!invite) {
+    return json({ message: 'Invite not found.' }, 404);
+  }
+
+  if (Number(invite.recipient_user_id) !== Number(currentUser.id)) {
+    return json({ message: 'You cannot accept this invite.' }, 403);
+  }
+
+  if (invite.status !== 'pending') {
+    return json({ message: 'Invite is no longer pending.' }, 422);
+  }
+
+  await upsertRoomMember(env, invite.watch_room_id, currentUser.id);
+  await run(
+    env.DB,
+    'UPDATE watch_room_invites SET status = ?, responded_at = ?, updated_at = ? WHERE id = ?',
+    ['accepted', nowIso(), nowIso(), inviteId],
+  );
+
+  return json({ data: await formatWatchRoom(env, invite.watch_room_id, currentUser.id) });
+}
+
+async function handleRejectWatchRoomInvite(env, currentUser, inviteId) {
+  const invite = await first(env.DB, 'SELECT * FROM watch_room_invites WHERE id = ?', [inviteId]);
+  if (!invite) {
+    return json({ message: 'Invite not found.' }, 404);
+  }
+
+  if (Number(invite.recipient_user_id) !== Number(currentUser.id)) {
+    return json({ message: 'You cannot reject this invite.' }, 403);
+  }
+
+  if (invite.status !== 'pending') {
+    return json({ message: 'Invite is no longer pending.' }, 422);
+  }
+
+  await run(
+    env.DB,
+    'UPDATE watch_room_invites SET status = ?, responded_at = ?, updated_at = ? WHERE id = ?',
+    ['rejected', nowIso(), nowIso(), inviteId],
+  );
+
+  return json({ message: 'Invite rejected.' });
+}
+
 async function listFriends(env, userId) {
   const friendships = await all(
     env.DB,
@@ -823,6 +1001,26 @@ async function listWatchRooms(env, userId) {
     summaries.push(await formatWatchRoomSummary(env, room, userId));
   }
   return summaries;
+}
+
+async function listWatchRoomInvites(env, userId) {
+  const [incomingRows, outgoingRows] = await Promise.all([
+    all(
+      env.DB,
+      'SELECT * FROM watch_room_invites WHERE recipient_user_id = ? AND status = ? ORDER BY created_at DESC',
+      [userId, 'pending'],
+    ),
+    all(
+      env.DB,
+      'SELECT * FROM watch_room_invites WHERE sender_user_id = ? AND status = ? ORDER BY created_at DESC',
+      [userId, 'pending'],
+    ),
+  ]);
+
+  return {
+    incoming: await Promise.all(incomingRows.map((invite) => formatWatchRoomInvite(env, invite, userId))),
+    outgoing: await Promise.all(outgoingRows.map((invite) => formatWatchRoomInvite(env, invite, userId))),
+  };
 }
 
 async function formatAuthUser(env, user) {
@@ -967,9 +1165,25 @@ async function formatWatchRoom(env, roomId, viewerId) {
   return {
     ...summary,
     tmdbId: room.tmdb_id == null ? null : Number(room.tmdb_id),
-    videoUrl: room.video_url,
+    videoUrl: room.video_url || null,
     members,
     messages,
+  };
+}
+
+async function formatWatchRoomInvite(env, invite, viewerId) {
+  const room = await first(env.DB, 'SELECT * FROM watch_rooms WHERE id = ?', [invite.watch_room_id]);
+  const sender = await getUserById(env, invite.sender_user_id);
+  const recipient = await getUserById(env, invite.recipient_user_id);
+
+  return {
+    id: Number(invite.id),
+    status: invite.status,
+    createdAt: invite.created_at || null,
+    respondedAt: invite.responded_at || null,
+    room: await formatWatchRoomSummary(env, room, viewerId),
+    sender: sender ? personPreview(sender) : null,
+    recipient: recipient ? personPreview(recipient) : null,
   };
 }
 

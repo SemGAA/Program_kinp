@@ -13,19 +13,25 @@ import {
 import { AppShell, sharedStyles } from '@/components/app-shell';
 import { AppColors } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
-import { ApiError, createWatchRoom, getWatchRooms, joinWatchRoom } from '@/lib/api';
-import type { WatchRoomSummary } from '@/types/app';
-
-const DEMO_VIDEO_URL = 'https://vjs.zencdn.net/v/oceans.mp4';
+import {
+  acceptWatchRoomInvite,
+  ApiError,
+  getWatchRoomInvites,
+  getWatchRooms,
+  joinWatchRoom,
+  rejectWatchRoomInvite,
+} from '@/lib/api';
+import { formatShortDate } from '@/lib/format';
+import type { WatchRoomInvitesPayload, WatchRoomSummary } from '@/types/app';
 
 export default function WatchRoomsScreen() {
   const router = useRouter();
   const { token } = useAuth();
   const [rooms, setRooms] = useState<WatchRoomSummary[]>([]);
+  const [invites, setInvites] = useState<WatchRoomInvitesPayload>({ incoming: [], outgoing: [] });
   const [joinCode, setJoinCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isCreatingDemo, setIsCreatingDemo] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
 
   useEffect(() => {
@@ -38,8 +44,12 @@ export default function WatchRoomsScreen() {
       setError(null);
 
       try {
-        const payload = await getWatchRooms(token);
-        setRooms(payload);
+        const [roomsPayload, invitesPayload] = await Promise.all([
+          getWatchRooms(token),
+          getWatchRoomInvites(token),
+        ]);
+        setRooms(roomsPayload);
+        setInvites(invitesPayload);
       } catch (caughtError) {
         setError(caughtError instanceof ApiError ? caughtError.message : 'Не удалось загрузить комнаты.');
       } finally {
@@ -49,31 +59,6 @@ export default function WatchRoomsScreen() {
 
     void load();
   }, [token]);
-
-  const handleCreateDemoRoom = async () => {
-    if (!token) {
-      return;
-    }
-
-    setIsCreatingDemo(true);
-    setError(null);
-
-    try {
-      const room = await createWatchRoom(
-        {
-          movie_title: 'Демо-комната: Oceans',
-          video_url: DEMO_VIDEO_URL,
-        },
-        token,
-      );
-
-      router.push(`/watch/${room.code}`);
-    } catch (caughtError) {
-      setError(caughtError instanceof ApiError ? caughtError.message : 'Не удалось создать демо-комнату.');
-    } finally {
-      setIsCreatingDemo(false);
-    }
-  };
 
   const handleJoinRoom = async () => {
     if (!token) {
@@ -98,10 +83,41 @@ export default function WatchRoomsScreen() {
     }
   };
 
+  const handleInviteResponse = async (inviteId: number, action: 'accept' | 'reject') => {
+    if (!token) {
+      return;
+    }
+
+    try {
+      if (action === 'accept') {
+        const room = await acceptWatchRoomInvite(inviteId, token);
+        router.push({
+          pathname: '/watch/[code]',
+          params: {
+            code: room.code,
+            initialRoom: JSON.stringify(room),
+          },
+        });
+        return;
+      }
+
+      await rejectWatchRoomInvite(inviteId, token);
+      setInvites((currentValue) => ({
+        ...currentValue,
+        incoming: currentValue.incoming.filter((invite) => invite.id !== inviteId),
+      }));
+    } catch (caughtError) {
+      Alert.alert(
+        'Ошибка',
+        caughtError instanceof ApiError ? caughtError.message : 'Не удалось обработать приглашение.',
+      );
+    }
+  };
+
   return (
     <AppShell
       title="Комнаты"
-      subtitle="Создавайте комнаты совместного просмотра, входите по коду и смотрите видео синхронно через интернет.">
+      subtitle="Входите по коду или принимайте приглашение от друга. Демо-комнаты больше не нужны: комната создаётся прямо из карточки выбранного тайтла.">
       <View style={[sharedStyles.card, styles.heroCard]}>
         <Text style={styles.sectionTitle}>Войти по коду</Text>
         <TextInput
@@ -119,22 +135,53 @@ export default function WatchRoomsScreen() {
             <Text style={sharedStyles.primaryButtonText}>Войти в комнату</Text>
           )}
         </Pressable>
-        <Pressable onPress={() => void handleCreateDemoRoom()} style={sharedStyles.secondaryButton}>
-          {isCreatingDemo ? (
-            <ActivityIndicator color={AppColors.textPrimary} />
-          ) : (
-            <Text style={sharedStyles.secondaryButtonText}>Создать демо-комнату</Text>
-          )}
-        </Pressable>
-        <Text style={sharedStyles.helperText}>
-          Для реального просмотра создавайте комнату из карточки фильма и вставляйте прямую ссылку на видео
-          формата mp4 или m3u8.
-        </Text>
       </View>
 
       {error ? (
         <View style={sharedStyles.card}>
           <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : null}
+
+      {invites.incoming.length > 0 ? (
+        <View style={styles.sectionBlock}>
+          <Text style={styles.sectionTitle}>Приглашения</Text>
+          {invites.incoming.map((invite) => (
+            <View key={invite.id} style={[sharedStyles.card, styles.inviteCard]}>
+              <Text style={styles.roomTitle}>{invite.room.movieTitle}</Text>
+              <Text style={sharedStyles.helperText}>
+                От {invite.sender?.name ?? 'друга'} • код {invite.room.code}
+              </Text>
+              <Text style={styles.metaText}>Отправлено {formatShortDate(invite.createdAt)}</Text>
+              <View style={styles.actionRow}>
+                <Pressable
+                  onPress={() => void handleInviteResponse(invite.id, 'accept')}
+                  style={[sharedStyles.primaryButton, styles.flexButton]}>
+                  <Text style={sharedStyles.primaryButtonText}>Принять</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => void handleInviteResponse(invite.id, 'reject')}
+                  style={[sharedStyles.secondaryButton, styles.flexButton]}>
+                  <Text style={sharedStyles.secondaryButtonText}>Отклонить</Text>
+                </Pressable>
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {invites.outgoing.length > 0 ? (
+        <View style={styles.sectionBlock}>
+          <Text style={styles.sectionTitle}>Отправленные приглашения</Text>
+          {invites.outgoing.map((invite) => (
+            <View key={invite.id} style={[sharedStyles.card, styles.inviteCard]}>
+              <Text style={styles.roomTitle}>{invite.room.movieTitle}</Text>
+              <Text style={sharedStyles.helperText}>
+                Для {invite.recipient?.name ?? 'друга'} • код {invite.room.code}
+              </Text>
+              <Text style={styles.metaText}>Ожидает ответа с {formatShortDate(invite.createdAt)}</Text>
+            </View>
+          ))}
         </View>
       ) : null}
 
@@ -144,10 +191,10 @@ export default function WatchRoomsScreen() {
         </View>
       ) : null}
 
-      {!isLoading && rooms.length === 0 ? (
+      {!isLoading && rooms.length === 0 && invites.incoming.length === 0 && invites.outgoing.length === 0 ? (
         <View style={sharedStyles.card}>
           <Text style={sharedStyles.emptyText}>
-            Пока нет комнат. Откройте карточку фильма из поиска или создайте демо-комнату для проверки.
+            Пока нет активных комнат. Откройте карточку фильма или сериала и создайте комнату просмотра.
           </Text>
         </View>
       ) : null}
@@ -184,13 +231,28 @@ export default function WatchRoomsScreen() {
 }
 
 const styles = StyleSheet.create({
+  actionRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
   errorText: {
     color: '#FF9A8B',
     fontSize: 14,
     lineHeight: 20,
   },
+  flexButton: {
+    flex: 1,
+  },
   heroCard: {
     gap: 12,
+  },
+  inviteCard: {
+    gap: 10,
+  },
+  metaText: {
+    color: AppColors.textSecondary,
+    fontSize: 12,
+    lineHeight: 18,
   },
   roomCard: {
     gap: 8,
@@ -208,6 +270,9 @@ const styles = StyleSheet.create({
     color: AppColors.textPrimary,
     fontSize: 20,
     fontWeight: '700',
+  },
+  sectionBlock: {
+    gap: 12,
   },
   sectionTitle: {
     color: AppColors.textPrimary,

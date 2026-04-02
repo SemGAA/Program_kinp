@@ -81,6 +81,18 @@ CREATE TABLE IF NOT EXISTS watch_room_messages (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS watch_room_invites (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  watch_room_id INTEGER NOT NULL,
+  sender_user_id INTEGER NOT NULL,
+  recipient_user_id INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TEXT NOT NULL,
+  responded_at TEXT,
+  updated_at TEXT NOT NULL,
+  UNIQUE(watch_room_id, recipient_user_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_friendships_status ON friendships(status);
 CREATE INDEX IF NOT EXISTS idx_notes_user ON notes(user_id);
 CREATE INDEX IF NOT EXISTS idx_notes_sent_to ON notes(sent_to);
@@ -88,3 +100,5 @@ CREATE INDEX IF NOT EXISTS idx_watch_rooms_host ON watch_rooms(host_user_id);
 CREATE INDEX IF NOT EXISTS idx_watch_room_members_room ON watch_room_members(watch_room_id);
 CREATE INDEX IF NOT EXISTS idx_watch_room_members_user ON watch_room_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_watch_room_messages_room ON watch_room_messages(watch_room_id);
+CREATE INDEX IF NOT EXISTS idx_watch_room_invites_recipient ON watch_room_invites(recipient_user_id);
+CREATE INDEX IF NOT EXISTS idx_watch_room_invites_sender ON watch_room_invites(sender_user_id);
