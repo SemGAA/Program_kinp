@@ -18,9 +18,9 @@ import {
   ApiError,
   createNote,
   createWatchRoom,
+  getMatchedNote,
   getMovieDetails,
   getMovieRecommendations,
-  getNotes,
   updateNote,
 } from '@/lib/api';
 import { formatRuntime } from '@/lib/format';
@@ -34,10 +34,17 @@ function readParam(value: string | string[] | undefined) {
 
 export default function MovieDetailsScreen() {
   const router = useRouter();
-  const { refreshUser, token } = useAuth();
+  const { token } = useAuth();
   const params = useLocalSearchParams<{
     fromName?: string;
+    initialMediaLabel?: string;
     initialNote?: string;
+    initialOverview?: string;
+    initialPosterPath?: string;
+    initialPosterUrl?: string;
+    initialRating?: string;
+    initialReleaseYear?: string;
+    initialTitle?: string;
     mediaType?: MediaType;
     noteId?: string;
     sharedNote?: string;
@@ -50,19 +57,57 @@ export default function MovieDetailsScreen() {
   const incomingAuthor = readParam(params.fromName);
   const initialOwnNote = readParam(params.initialNote);
   const initialNoteId = Number(readParam(params.noteId) ?? '0') || null;
+  const initialMovie = useMemo<MovieDetails | null>(() => {
+    const title = readParam(params.initialTitle)?.trim();
+    if (!title || !Number.isFinite(tmdbId)) {
+      return null;
+    }
 
-  const [movie, setMovie] = useState<MovieDetails | null>(null);
+    const initialRating = Number(readParam(params.initialRating) ?? '');
+    const initialReleaseYear = Number(readParam(params.initialReleaseYear) ?? '');
+
+    return {
+      backdropPath: null,
+      backdropUrl: null,
+      genres: [],
+      id: tmdbId,
+      mediaLabel: readParam(params.initialMediaLabel) || (mediaType === 'tv' ? 'Сериал' : 'Фильм'),
+      mediaType,
+      overview: readParam(params.initialOverview) || '',
+      posterPath: readParam(params.initialPosterPath) || null,
+      posterUrl: readParam(params.initialPosterUrl) || null,
+      rating: Number.isFinite(initialRating) ? initialRating : null,
+      releaseYear: Number.isFinite(initialReleaseYear) ? initialReleaseYear : null,
+      runtime: null,
+      title,
+    };
+  }, [
+    mediaType,
+    params.initialMediaLabel,
+    params.initialOverview,
+    params.initialPosterPath,
+    params.initialPosterUrl,
+    params.initialRating,
+    params.initialReleaseYear,
+    params.initialTitle,
+    tmdbId,
+  ]);
+
+  const [movie, setMovie] = useState<MovieDetails | null>(initialMovie);
   const [noteId, setNoteId] = useState<number | null>(initialNoteId);
   const [noteText, setNoteText] = useState(initialOwnNote ?? '');
   const [videoUrl, setVideoUrl] = useState('');
   const [recommendations, setRecommendations] = useState<MovieRecommendation[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!initialMovie);
   const [isSaving, setIsSaving] = useState(false);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
+  const [isLoadingNoteState, setIsLoadingNoteState] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+
     const loadMovie = async () => {
       if (!token || !Number.isFinite(tmdbId)) {
         setError('Некорректный идентификатор тайтла.');
@@ -70,37 +115,69 @@ export default function MovieDetailsScreen() {
         return;
       }
 
-      setIsLoading(true);
+      if (!initialMovie) {
+        setIsLoading(true);
+      }
       setError(null);
 
       try {
-        const [moviePayload, notesPayload] = await Promise.all([
-          getMovieDetails(tmdbId, mediaType, token),
-          getNotes(token),
-        ]);
-
-        const existingOwnNote =
-          notesPayload.own.find((note) => note.id === initialNoteId) ??
-          notesPayload.own.find((note) => note.tmdbId === tmdbId && note.mediaType === mediaType);
+        const moviePayload = await getMovieDetails(tmdbId, mediaType, token);
+        if (!isMounted) {
+          return;
+        }
 
         setMovie(moviePayload);
-
-        if (existingOwnNote) {
-          setNoteId(existingOwnNote.id);
-          setNoteText(existingOwnNote.noteText);
-        } else if (initialOwnNote) {
-          setNoteText(initialOwnNote);
-        }
       } catch (caughtError) {
+        if (!isMounted) {
+          return;
+        }
+
         const message = caughtError instanceof ApiError ? caughtError.message : 'Не удалось загрузить карточку.';
         setError(message);
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    const loadOwnNote = async () => {
+      if (!token || !Number.isFinite(tmdbId)) {
+        return;
+      }
+
+      if (initialNoteId || initialOwnNote) {
+        setNoteId(initialNoteId);
+        setNoteText(initialOwnNote ?? '');
+        return;
+      }
+
+      setIsLoadingNoteState(true);
+
+      try {
+        const existingOwnNote = await getMatchedNote(tmdbId, mediaType, token);
+        if (!isMounted || !existingOwnNote) {
+          return;
+        }
+
+        setNoteId(existingOwnNote.id);
+        setNoteText(existingOwnNote.noteText);
+      } catch {
+        // The card should stay responsive even if note lookup fails.
+      } finally {
+        if (isMounted) {
+          setIsLoadingNoteState(false);
+        }
       }
     };
 
     void loadMovie();
-  }, [initialNoteId, initialOwnNote, mediaType, tmdbId, token]);
+    void loadOwnNote();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [initialMovie, initialNoteId, initialOwnNote, mediaType, tmdbId, token]);
 
   const handleSaveNote = async () => {
     if (!token || !movie) {
@@ -133,7 +210,6 @@ export default function MovieDetailsScreen() {
         setNoteId(createdNote.id);
       }
 
-      await refreshUser();
       Alert.alert('Сохранено', 'Заметка обновлена.');
     } catch (caughtError) {
       const message = caughtError instanceof ApiError ? caughtError.message : 'Не удалось сохранить заметку.';
@@ -194,7 +270,13 @@ export default function MovieDetailsScreen() {
         token,
       );
 
-      router.push(`/watch/${room.code}`);
+      router.push({
+        pathname: '/watch/[code]',
+        params: {
+          code: room.code,
+          initialRoom: JSON.stringify(room),
+        },
+      });
     } catch (caughtError) {
       const message = caughtError instanceof ApiError ? caughtError.message : 'Не удалось создать комнату.';
       setError(message);
@@ -270,6 +352,9 @@ export default function MovieDetailsScreen() {
                 </View>
               ) : null}
             </View>
+            {isLoadingNoteState && !noteId && !noteText ? (
+              <Text style={sharedStyles.helperText}>Подтягиваем вашу заметку...</Text>
+            ) : null}
             <TextInput
               multiline
               numberOfLines={6}

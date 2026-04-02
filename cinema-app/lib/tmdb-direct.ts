@@ -4,6 +4,8 @@ import type { MediaType, MovieDetails, MovieRecommendation, MovieSearchResult } 
 
 const TMDB_API_BASE_URL = 'https://api.themoviedb.org/3';
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
+const TMDB_CACHE_TTL_MS = 5 * 60 * 1000;
+const TMDB_SEARCH_RESULTS_LIMIT = 16;
 
 type TmdbMediaType = 'movie' | 'tv' | 'person';
 
@@ -25,6 +27,15 @@ type TmdbDetailsPayload = TmdbSummaryPayload & {
   genres?: Array<{ id: number; name: string }>;
   runtime?: number | null;
 };
+
+type CacheEntry<T> = {
+  expiresAt: number;
+  value: T;
+};
+
+const searchCache = new Map<string, CacheEntry<MovieSearchResult[]>>();
+const detailsCache = new Map<string, CacheEntry<MovieDetails>>();
+const recommendationsCache = new Map<string, CacheEntry<MovieRecommendation[]>>();
 
 function readExtraValue(key: 'tmdbApiKey' | 'tmdbReadAccessToken') {
   const extra = Constants.expoConfig?.extra as
@@ -105,6 +116,41 @@ function mapDetails(item: TmdbDetailsPayload, requestedMediaType: MediaType): Mo
   };
 }
 
+function readCache<T>(cache: Map<string, CacheEntry<T>>, key: string) {
+  const cached = cache.get(key);
+  if (!cached) {
+    return null;
+  }
+
+  if (cached.expiresAt <= Date.now()) {
+    cache.delete(key);
+    return null;
+  }
+
+  return cached.value;
+}
+
+function writeCache<T>(cache: Map<string, CacheEntry<T>>, key: string, value: T) {
+  cache.set(key, {
+    expiresAt: Date.now() + TMDB_CACHE_TTL_MS,
+    value,
+  });
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export function hasDirectTmdbConfig() {
   return Boolean(DIRECT_TMDB_API_KEY || DIRECT_TMDB_READ_ACCESS_TOKEN);
 }
@@ -128,7 +174,7 @@ async function tmdbRequest<T>(path: string, query: Record<string, string | numbe
     params.set('api_key', DIRECT_TMDB_API_KEY);
   }
 
-  const response = await fetch(`${TMDB_API_BASE_URL}/${path}?${params.toString()}`, {
+  const response = await fetchWithTimeout(`${TMDB_API_BASE_URL}/${path}?${params.toString()}`, {
     headers: {
       accept: 'application/json',
       ...(DIRECT_TMDB_READ_ACCESS_TOKEN
@@ -145,37 +191,68 @@ async function tmdbRequest<T>(path: string, query: Record<string, string | numbe
 }
 
 export async function searchDirectTmdb(query: string) {
+  const normalizedQuery = query.trim().toLowerCase();
+  const cached = readCache(searchCache, normalizedQuery);
+  if (cached) {
+    return cached;
+  }
+
   const payload = await tmdbRequest<{ results?: TmdbSummaryPayload[] }>('search/multi', {
     include_adult: false,
     language: 'ru-RU',
+    page: 1,
     query,
   });
 
-  return (payload.results ?? [])
+  const results = (payload.results ?? [])
     .filter((item) => item.media_type === 'movie' || item.media_type === 'tv')
-    .map(mapSummary);
+    .map(mapSummary)
+    .slice(0, TMDB_SEARCH_RESULTS_LIMIT);
+
+  writeCache(searchCache, normalizedQuery, results);
+  return results;
 }
 
 export async function getDirectMovieDetails(tmdbId: number, mediaType: MediaType) {
+  const cacheKey = `${mediaType}:${tmdbId}`;
+  const cached = readCache(detailsCache, cacheKey);
+  if (cached) {
+    return cached;
+  }
+
   const payload = await tmdbRequest<TmdbDetailsPayload>(`${mediaType}/${tmdbId}`, {
     language: 'ru-RU',
   });
 
-  return mapDetails(payload, mediaType);
+  const details = mapDetails(payload, mediaType);
+  writeCache(detailsCache, cacheKey, details);
+  return details;
 }
 
 export async function getDirectMovieRecommendations(tmdbId: number, mediaType: MediaType) {
+  const cacheKey = `${mediaType}:${tmdbId}`;
+  const cached = readCache(recommendationsCache, cacheKey);
+  if (cached) {
+    return cached;
+  }
+
   const payload = await tmdbRequest<{ results?: TmdbSummaryPayload[] }>(
     `${mediaType}/${tmdbId}/recommendations`,
     {
       language: 'ru-RU',
+      page: 1,
     },
   );
 
-  return (payload.results ?? []).map((item) =>
-    mapSummary({
-      ...item,
-      media_type: mediaType,
-    }),
-  ) as MovieRecommendation[];
+  const recommendations = (payload.results ?? [])
+    .map((item) =>
+      mapSummary({
+        ...item,
+        media_type: mediaType,
+      }),
+    )
+    .slice(0, TMDB_SEARCH_RESULTS_LIMIT) as MovieRecommendation[];
+
+  writeCache(recommendationsCache, cacheKey, recommendations);
+  return recommendations;
 }

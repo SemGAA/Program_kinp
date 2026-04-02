@@ -1,4 +1,4 @@
-import { getApiBaseUrl, refreshApiBaseUrl } from '@/lib/runtime-config';
+﻿import { DEFAULT_API_BASE_URL } from '@/lib/config';
 import {
   getDirectMovieDetails,
   getDirectMovieRecommendations,
@@ -28,6 +28,15 @@ type RequestOptions = {
   method?: 'GET' | 'POST' | 'PATCH';
   token?: string | null;
 };
+
+type NotesCacheEntry = {
+  expiresAt: number;
+  value: NotesPayload;
+};
+
+const NOTES_CACHE_TTL_MS = 30 * 1000;
+const notesCache = new Map<string, NotesCacheEntry>();
+const API_REQUEST_TIMEOUT_MS = 8000;
 
 class ApiError extends Error {
   status: number;
@@ -88,42 +97,21 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     headers.Authorization = `Bearer ${options.token}`;
   }
 
-  const executeFetch = (baseUrl: string) =>
-    fetch(`${baseUrl}${path}`, {
+  let response: Response;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), API_REQUEST_TIMEOUT_MS);
+
+  try {
+    response = await fetch(`${DEFAULT_API_BASE_URL}${path}`, {
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
       headers,
       method: options.method ?? 'GET',
+      signal: controller.signal,
     });
-
-  const initialBaseUrl = getApiBaseUrl();
-  let response: Response | null = null;
-
-  try {
-    response = await executeFetch(initialBaseUrl);
   } catch {
-    response = null;
-  }
-
-  if (!response || response.status >= 500) {
-    const refreshedBaseUrl = await refreshApiBaseUrl();
-
-    if (refreshedBaseUrl !== initialBaseUrl) {
-      try {
-        response = await executeFetch(refreshedBaseUrl);
-      } catch {
-        if (!response) {
-          throw new ApiConnectionError(
-            'Не удалось подключиться к backend API. Проверьте адрес сервера и доступность сети.',
-          );
-        }
-      }
-    }
-  }
-
-  if (!response) {
-    throw new ApiConnectionError(
-      'Не удалось подключиться к backend API. Проверьте адрес сервера и доступность сети.',
-    );
+    throw new ApiConnectionError('Не удалось подключиться к приложению. Проверьте интернет-соединение и попробуйте ещё раз.');
+  } finally {
+    clearTimeout(timeout);
   }
 
   const contentType = response.headers.get('content-type') ?? '';
@@ -134,6 +122,31 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   }
 
   return payload as T;
+}
+
+function readNotesCache(token: string) {
+  const cached = notesCache.get(token);
+  if (!cached) {
+    return null;
+  }
+
+  if (cached.expiresAt <= Date.now()) {
+    notesCache.delete(token);
+    return null;
+  }
+
+  return cached.value;
+}
+
+function writeNotesCache(token: string, value: NotesPayload) {
+  notesCache.set(token, {
+    expiresAt: Date.now() + NOTES_CACHE_TTL_MS,
+    value,
+  });
+}
+
+function invalidateNotesCache(token: string) {
+  notesCache.delete(token);
 }
 
 export async function registerUser(payload: {
@@ -172,6 +185,7 @@ export async function searchMovies(query: string, token: string) {
     try {
       return await searchDirectTmdb(query);
     } catch {
+      // Fall back to the public backend if direct TMDB access is unavailable.
     }
   }
 
@@ -188,6 +202,7 @@ export async function getMovieDetails(tmdbId: number, mediaType: MediaType, toke
     try {
       return await getDirectMovieDetails(tmdbId, mediaType);
     } catch {
+      // Fall back to the public backend if direct TMDB access is unavailable.
     }
   }
 
@@ -208,6 +223,7 @@ export async function getMovieRecommendations(
     try {
       return await getDirectMovieRecommendations(tmdbId, mediaType);
     } catch {
+      // Fall back to the public backend if direct TMDB access is unavailable.
     }
   }
 
@@ -226,7 +242,23 @@ export async function getMovieRecommendations(
 }
 
 export async function getNotes(token: string) {
-  return request<NotesPayload>('/notes', { token });
+  const cached = readNotesCache(token);
+  if (cached) {
+    return cached;
+  }
+
+  const payload = await request<NotesPayload>('/notes', { token });
+  writeNotesCache(token, payload);
+  return payload;
+}
+
+export async function getMatchedNote(tmdbId: number, mediaType: MediaType, token: string) {
+  const payload = await request<{ data: MovieNote | null }>(
+    `/notes/match?tmdbId=${encodeURIComponent(String(tmdbId))}&mediaType=${encodeURIComponent(mediaType)}`,
+    { token },
+  );
+
+  return payload.data;
 }
 
 export async function createNote(
@@ -246,6 +278,7 @@ export async function createNote(
     token,
   });
 
+  invalidateNotesCache(token);
   return response.data;
 }
 
@@ -256,6 +289,7 @@ export async function updateNote(noteId: number, noteText: string, token: string
     token,
   });
 
+  invalidateNotesCache(token);
   return response.data;
 }
 
@@ -266,6 +300,7 @@ export async function shareNote(noteId: number, recipientId: number, token: stri
     token,
   });
 
+  invalidateNotesCache(token);
   return response.data;
 }
 
@@ -275,6 +310,7 @@ export async function acceptNote(noteId: number, token: string) {
     token,
   });
 
+  invalidateNotesCache(token);
   return response.data;
 }
 
@@ -284,6 +320,7 @@ export async function rejectNote(noteId: number, token: string) {
     token,
   });
 
+  invalidateNotesCache(token);
   return response.data;
 }
 
@@ -407,3 +444,8 @@ export async function sendWatchRoomMessage(
 }
 
 export { ApiConnectionError, ApiError };
+
+
+
+
+

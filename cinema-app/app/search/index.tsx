@@ -52,7 +52,7 @@ export default function SearchScreen() {
           autoCapitalize="none"
           autoCorrect={false}
           onChangeText={setQuery}
-          onSubmitEditing={handleSearch}
+          onSubmitEditing={() => void handleSearch()}
           placeholder="Название фильма или сериала"
           placeholderTextColor={AppColors.textSecondary}
           style={sharedStyles.input}
@@ -75,6 +75,13 @@ export default function SearchScreen() {
             router.push({
               pathname: '/movie/[tmdbId]',
               params: {
+                initialMediaLabel: movie.mediaLabel,
+                initialOverview: movie.overview,
+                initialPosterPath: movie.posterPath ?? '',
+                initialPosterUrl: movie.posterUrl ?? '',
+                initialRating: movie.rating === null ? '' : String(movie.rating),
+                initialReleaseYear: movie.releaseYear === null ? '' : String(movie.releaseYear),
+                initialTitle: movie.title,
                 mediaType: movie.mediaType,
                 tmdbId: String(movie.id),
               },
@@ -107,9 +114,7 @@ export default function SearchScreen() {
       {!hasSearched ? (
         <View style={sharedStyles.card}>
           <Text style={sharedStyles.emptyText}>
-            Начните с поиска фильма, сериала, дорамы, аниме или мультсериала. После открытия
-            карточки можно сохранить заметку и создать комнату просмотра по прямой ссылке на
-            видео.
+            Начните с поиска фильма, сериала, дорамы, аниме или мультсериала. После открытия карточки можно сохранить заметку и создать комнату просмотра по прямой ссылке на видео.
           </Text>
         </View>
       ) : null}

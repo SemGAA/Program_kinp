@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,47 +13,18 @@ import {
 
 import { AppColors } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
-import { useRuntimeConfig } from '@/hooks/use-runtime-config';
 import { ApiConnectionError, ApiError } from '@/lib/api';
 
 type Mode = 'login' | 'register';
 
-type DemoAccount = {
-  email: string;
-  password: string;
-};
-
 export default function AuthScreen() {
   const { signIn, signUp } = useAuth();
-  const { apiBaseUrl, defaultApiBaseUrl, refreshApiUrl, resetApiUrl, setApiUrl } = useRuntimeConfig();
   const [mode, setMode] = useState<Mode>('login');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [apiUrlDraft, setApiUrlDraft] = useState(apiBaseUrl);
   const [error, setError] = useState<string | null>(null);
-  const [showManualServerControls, setShowManualServerControls] = useState(false);
-  const [isRefreshingApiUrl, setIsRefreshingApiUrl] = useState(false);
-  const [isSavingApiUrl, setIsSavingApiUrl] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    setApiUrlDraft(apiBaseUrl);
-  }, [apiBaseUrl]);
-
-  useEffect(() => {
-    const syncApiUrl = async () => {
-      setIsRefreshingApiUrl(true);
-
-      try {
-        await refreshApiUrl();
-      } finally {
-        setIsRefreshingApiUrl(false);
-      }
-    };
-
-    void syncApiUrl();
-  }, [refreshApiUrl]);
 
   const handleSubmit = async () => {
     if (!email.trim() || !password.trim() || (mode === 'register' && !name.trim())) {
@@ -72,73 +42,16 @@ export default function AuthScreen() {
         await signUp({ email: email.trim(), name: name.trim(), password });
       }
     } catch (caughtError) {
-      let message = 'Не удалось выполнить запрос.';
-
       if (caughtError instanceof ApiConnectionError) {
-        message = `Нет подключения к серверу (${apiBaseUrl}). Проверьте, что backend запущен и публичный адрес обновился.`;
+        setError('Сервер временно недоступен. Проверьте интернет и попробуйте ещё раз.');
       } else if (caughtError instanceof ApiError) {
-        message = caughtError.message;
+        setError(caughtError.message);
+      } else {
+        setError('Не удалось выполнить запрос. Попробуйте ещё раз.');
       }
-
-      setError(message);
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleSaveApiUrl = async () => {
-    if (!apiUrlDraft.trim()) {
-      setError('Укажите адрес backend API.');
-      return;
-    }
-
-    setIsSavingApiUrl(true);
-    setError(null);
-
-    try {
-      await setApiUrl(apiUrlDraft);
-      Alert.alert('Сервер обновлён', 'Новый адрес backend сохранён в приложении.');
-    } catch {
-      setError('Не удалось сохранить адрес сервера.');
-    } finally {
-      setIsSavingApiUrl(false);
-    }
-  };
-
-  const handleResetApiUrl = async () => {
-    setIsSavingApiUrl(true);
-    setError(null);
-
-    try {
-      await resetApiUrl();
-      Alert.alert('Сервер сброшен', `Вернули адрес по умолчанию: ${defaultApiBaseUrl}`);
-    } catch {
-      setError('Не удалось сбросить адрес сервера.');
-    } finally {
-      setIsSavingApiUrl(false);
-    }
-  };
-
-  const handleRefreshApiUrl = async () => {
-    setIsRefreshingApiUrl(true);
-    setError(null);
-
-    try {
-      const nextValue = await refreshApiUrl();
-      Alert.alert('Сервер обновлён', `Приложение использует адрес: ${nextValue}`);
-    } catch {
-      setError('Не удалось автоматически обновить адрес сервера.');
-    } finally {
-      setIsRefreshingApiUrl(false);
-    }
-  };
-
-  const applyDemoAccount = (account: DemoAccount) => {
-    setMode('login');
-    setName('');
-    setEmail(account.email);
-    setPassword(account.password);
-    setError(null);
   };
 
   return (
@@ -148,68 +61,10 @@ export default function AuthScreen() {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.hero}>
           <Text style={styles.eyebrow}>Cinema Notes</Text>
-          <Text style={styles.title}>Вход и совместный просмотр</Text>
+          <Text style={styles.title}>Вход и регистрация</Text>
           <Text style={styles.subtitle}>
-            Адрес backend подхватывается автоматически. Обычному пользователю ничего вручную
-            вводить не нужно.
+            Приложение само подключается к серверу. Пользователю нужен только аккаунт.
           </Text>
-        </View>
-
-        <View style={styles.serverCard}>
-          <Text style={styles.serverTitle}>Подключение к серверу</Text>
-          <Text style={styles.serverHint}>
-            Приложение само подтягивает свежий публичный адрес. Ручной ввод нужен только как
-            запасной вариант.
-          </Text>
-          <Text style={styles.serverValue}>Сейчас используется: {apiBaseUrl}</Text>
-          <View style={styles.serverButtonRow}>
-            <Pressable
-              onPress={() => void handleRefreshApiUrl()}
-              style={[styles.secondaryButton, styles.flexButton]}>
-              {isRefreshingApiUrl ? (
-                <ActivityIndicator color={AppColors.textPrimary} />
-              ) : (
-                <Text style={styles.secondaryButtonText}>Обновить автоматически</Text>
-              )}
-            </Pressable>
-          </View>
-          <Pressable
-            onPress={() => setShowManualServerControls((currentValue) => !currentValue)}
-            style={styles.ghostButton}>
-            <Text style={styles.ghostButtonText}>
-              {showManualServerControls ? 'Скрыть ручные настройки' : 'Показать ручные настройки'}
-            </Text>
-          </Pressable>
-          {showManualServerControls ? (
-            <>
-              <TextInput
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="url"
-                onChangeText={setApiUrlDraft}
-                placeholder="https://your-public-backend.example/api"
-                placeholderTextColor={AppColors.textSecondary}
-                style={styles.input}
-                value={apiUrlDraft}
-              />
-              <View style={styles.serverButtonRow}>
-                <Pressable
-                  onPress={() => void handleSaveApiUrl()}
-                  style={[styles.secondaryButton, styles.flexButton]}>
-                  {isSavingApiUrl ? (
-                    <ActivityIndicator color={AppColors.textPrimary} />
-                  ) : (
-                    <Text style={styles.secondaryButtonText}>Сохранить адрес</Text>
-                  )}
-                </Pressable>
-                <Pressable
-                  onPress={() => void handleResetApiUrl()}
-                  style={[styles.ghostButton, styles.flexButton]}>
-                  <Text style={styles.ghostButtonText}>Сбросить</Text>
-                </Pressable>
-              </View>
-            </>
-          ) : null}
         </View>
 
         <View style={styles.switchRow}>
@@ -227,35 +82,6 @@ export default function AuthScreen() {
           </Pressable>
         </View>
 
-        <View style={styles.demoCard}>
-          <Text style={styles.demoTitle}>Быстрый вход для теста</Text>
-          <Text style={styles.subtitle}>
-            После `php artisan migrate:fresh --seed` доступны два тестовых аккаунта.
-          </Text>
-          <View style={styles.demoRow}>
-            <Pressable
-              onPress={() =>
-                applyDemoAccount({
-                  email: 'alice@example.com',
-                  password: 'password123',
-                })
-              }
-              style={styles.demoButton}>
-              <Text style={styles.demoButtonText}>Alice</Text>
-            </Pressable>
-            <Pressable
-              onPress={() =>
-                applyDemoAccount({
-                  email: 'bob@example.com',
-                  password: 'password123',
-                })
-              }
-              style={styles.demoButton}>
-              <Text style={styles.demoButtonText}>Bob</Text>
-            </Pressable>
-          </View>
-        </View>
-
         <View style={styles.card}>
           {mode === 'register' ? (
             <TextInput
@@ -267,6 +93,7 @@ export default function AuthScreen() {
               value={name}
             />
           ) : null}
+
           <TextInput
             autoCapitalize="none"
             keyboardType="email-address"
@@ -276,6 +103,7 @@ export default function AuthScreen() {
             style={styles.input}
             value={email}
           />
+
           <TextInput
             onChangeText={setPassword}
             placeholder="Пароль"
@@ -317,37 +145,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 20,
   },
-  demoButton: {
-    alignItems: 'center',
-    backgroundColor: AppColors.cardMuted,
-    borderColor: AppColors.border,
-    borderRadius: 16,
-    borderWidth: 1,
-    flex: 1,
-    paddingVertical: 12,
-  },
-  demoButtonText: {
-    color: AppColors.textPrimary,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  demoCard: {
-    backgroundColor: AppColors.card,
-    borderColor: AppColors.border,
-    borderRadius: 24,
-    borderWidth: 1,
-    gap: 12,
-    padding: 18,
-  },
-  demoRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  demoTitle: {
-    color: AppColors.textPrimary,
-    fontSize: 18,
-    fontWeight: '700',
-  },
   errorText: {
     color: '#FF9A8B',
     fontSize: 14,
@@ -359,22 +156,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1.1,
     textTransform: 'uppercase',
-  },
-  flexButton: {
-    flex: 1,
-  },
-  ghostButton: {
-    alignItems: 'center',
-    borderColor: AppColors.border,
-    borderRadius: 18,
-    borderWidth: 1,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-  },
-  ghostButtonText: {
-    color: AppColors.textSecondary,
-    fontSize: 14,
-    fontWeight: '700',
   },
   hero: {
     gap: 10,
@@ -392,47 +173,6 @@ const styles = StyleSheet.create({
   screen: {
     backgroundColor: AppColors.background,
     flex: 1,
-  },
-  secondaryButton: {
-    alignItems: 'center',
-    backgroundColor: AppColors.cardMuted,
-    borderColor: AppColors.border,
-    borderRadius: 18,
-    borderWidth: 1,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-  },
-  secondaryButtonText: {
-    color: AppColors.textPrimary,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  serverButtonRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  serverCard: {
-    backgroundColor: AppColors.card,
-    borderColor: AppColors.border,
-    borderRadius: 24,
-    borderWidth: 1,
-    gap: 12,
-    padding: 18,
-  },
-  serverHint: {
-    color: AppColors.textSecondary,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  serverValue: {
-    color: AppColors.textPrimary,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  serverTitle: {
-    color: AppColors.textPrimary,
-    fontSize: 18,
-    fontWeight: '700',
   },
   submitButton: {
     alignItems: 'center',

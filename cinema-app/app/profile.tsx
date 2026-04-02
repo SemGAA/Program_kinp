@@ -5,12 +5,10 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { AppShell, sharedStyles } from '@/components/app-shell';
 import { AppColors } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
-import { useRuntimeConfig } from '@/hooks/use-runtime-config';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { isLoading, refreshUser, signOut, user } = useAuth();
-  const { apiBaseUrl } = useRuntimeConfig();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = async () => {
@@ -23,9 +21,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <AppShell
-      title="Профиль"
-      subtitle="Имя, email, счётчики и текущий сервер, к которому подключено приложение.">
+    <AppShell title="Профиль" subtitle="Имя, email и счётчики активности вашего аккаунта.">
       <Pressable onPress={() => router.back()} style={styles.backButton}>
         <Text style={styles.backButtonText}>Назад</Text>
       </Pressable>
@@ -47,14 +43,6 @@ export default function ProfileScreen() {
           <Text style={styles.statValue}>{user?.stats.friends ?? 0}</Text>
           <Text style={styles.statLabel}>друзей</Text>
         </View>
-      </View>
-
-      <View style={[sharedStyles.card, styles.serverCard]}>
-        <Text style={styles.serverTitle}>Текущий backend</Text>
-        <Text style={sharedStyles.helperText}>{apiBaseUrl}</Text>
-        <Text style={sharedStyles.helperText}>
-          Если адрес сервера изменится, выйдите из аккаунта и поменяйте его на экране входа.
-        </Text>
       </View>
 
       <View style={[sharedStyles.card, styles.actionsCard]}>
@@ -114,14 +102,6 @@ const styles = StyleSheet.create({
   profileCard: {
     alignItems: 'center',
     gap: 10,
-  },
-  serverCard: {
-    gap: 10,
-  },
-  serverTitle: {
-    color: AppColors.textPrimary,
-    fontSize: 18,
-    fontWeight: '700',
   },
   statCard: {
     alignItems: 'center',

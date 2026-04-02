@@ -14,7 +14,6 @@ import {
 import { AppShell, sharedStyles } from '@/components/app-shell';
 import { AppColors } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
-import { useRuntimeConfig } from '@/hooks/use-runtime-config';
 import {
   ApiError,
   getWatchRoom,
@@ -27,20 +26,36 @@ function readParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
+function readInitialRoom(value: string | string[] | undefined): WatchRoom | null {
+  const rawValue = readParam(value);
+  if (!rawValue) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(rawValue) as WatchRoom;
+  } catch {
+    return null;
+  }
+}
+
 export default function WatchRoomScreen() {
-  const { code: codeParam } = useLocalSearchParams<{ code: string }>();
+  const { code: codeParam, initialRoom: initialRoomParam } = useLocalSearchParams<{
+    code: string;
+    initialRoom?: string;
+  }>();
   const code = (readParam(codeParam) ?? '').toUpperCase();
+  const initialRoom = useMemo(() => readInitialRoom(initialRoomParam), [initialRoomParam]);
   const { token, user } = useAuth();
-  const { apiBaseUrl } = useRuntimeConfig();
   const videoRef = useRef<Video | null>(null);
   const applyingRemoteRef = useRef(false);
   const lastSentRef = useRef<{ positionMs: number; state: WatchPlayback['state']; sentAt: number } | null>(
     null,
   );
 
-  const [room, setRoom] = useState<WatchRoom | null>(null);
+  const [room, setRoom] = useState<WatchRoom | null>(initialRoom);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!initialRoom);
   const [messageBody, setMessageBody] = useState('');
   const [messageKind, setMessageKind] = useState<'chat' | 'note'>('chat');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
@@ -89,7 +104,10 @@ export default function WatchRoomScreen() {
           await videoRef.current.playAsync();
         }
 
-        if ((nextRoom.playback.state === 'paused' || nextRoom.playback.state === 'ended') && status.isPlaying) {
+        if (
+          (nextRoom.playback.state === 'paused' || nextRoom.playback.state === 'ended') &&
+          status.isPlaying
+        ) {
           await videoRef.current.pauseAsync();
         }
       } finally {
@@ -211,7 +229,7 @@ export default function WatchRoomScreen() {
     }
 
     await Share.share({
-      message: `Комната просмотра ${room.movieTitle}\nКод: ${room.code}\nСервер: ${apiBaseUrl}`,
+      message: `Комната просмотра: ${room.movieTitle}\nКод комнаты: ${room.code}`,
       title: `Комната ${room.code}`,
     });
   };

@@ -3,7 +3,7 @@
     "name": "cinema-app",
     "slug": "cinema-app",
     "owner": "semga",
-    "version": "1.3.1",
+    "version": "1.4.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "cinemaapp",
@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "com.semga.cinemanotes",
-      "versionCode": 7,
+      "versionCode": 10,
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -49,6 +49,8 @@
       "reactCompiler": true
     },
     "extra": {
+      "apiBaseUrl": "https://cinema-notes-api.semgacinema20260402.workers.dev/api",
+      "tmdbApiKey": "c05cabab9351fafd2b28de9c14964ab4",
       "router": {},
       "eas": {
         "projectId": "d4f72c6c-eefb-4490-bfe3-75ad8d9f0659"
