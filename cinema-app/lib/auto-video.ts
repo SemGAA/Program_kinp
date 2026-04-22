@@ -1,4 +1,5 @@
 import { findBestJellyfinPlaybackMatch } from '@/lib/jellyfin';
+import { inspectPlaybackUrl, isAllowedPlaybackUrl } from '@/lib/video-source-policy';
 import type { MediaType, MovieSearchResult } from '@/types/app';
 
 type ResolveAutoVideoSourceInput = {
@@ -71,6 +72,30 @@ function buildExternalVideoResult(query: string): MovieSearchResult[] {
   }
 
   const normalizedUrl = normalizeVideoUrl(trimmedQuery);
+  const policy = inspectPlaybackUrl(normalizedUrl);
+
+  if (!policy.allowed) {
+    return [
+      {
+        id: hashStringToNumber(`blocked:${normalizedUrl}`),
+        mediaLabel: 'Источник заблокирован',
+        mediaType: 'movie',
+        overview:
+          policy.reason ||
+          'Этот источник не подходит для встроенного просмотра Cinema Notes.',
+        posterPath: null,
+        posterUrl: null,
+        rating: null,
+        releaseYear: null,
+        sourceKind: 'external',
+        sourceLabel: 'Заблокировано политикой источников',
+        sourceProvider: 'Cinema Notes',
+        title: 'Источник не подключён',
+        videoUrl: null,
+      },
+    ];
+  }
+
   const youtubeId = getYouTubeVideoId(normalizedUrl);
 
   if (youtubeId) {
@@ -126,7 +151,7 @@ function buildExternalVideoResult(query: string): MovieSearchResult[] {
 
 export async function resolveAutoVideoSource(input: ResolveAutoVideoSourceInput) {
   const explicitResults = buildExternalVideoResult(input.title);
-  if (explicitResults[0]?.videoUrl) {
+  if (explicitResults[0]?.videoUrl && isAllowedPlaybackUrl(explicitResults[0].videoUrl)) {
     return explicitResults[0].videoUrl;
   }
 

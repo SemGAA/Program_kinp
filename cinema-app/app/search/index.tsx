@@ -65,6 +65,10 @@ function getSourceBadge(movie: MovieSearchResult) {
     return 'Прямая ссылка · встроенный просмотр';
   }
 
+  if (movie.sourceKind === 'external' && movie.sourceLabel?.includes('Заблокировано')) {
+    return 'Заблокировано · источник не подключён';
+  }
+
   if (movie.sourceKind === 'shikimori') {
     return 'Аниме · нужен Jellyfin для видео';
   }
