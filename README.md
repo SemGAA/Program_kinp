@@ -6,24 +6,33 @@
 ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare%20Workers-111827?style=for-the-badge&logo=cloudflare&logoColor=f38020)
 ![Android](https://img.shields.io/badge/Android-111827?style=for-the-badge&logo=android&logoColor=3ddc84)
 
-Мобильное Android-приложение для совместного просмотра, заметок, друзей и чата рядом с видео.
+Мобильное Android-приложение для совместного просмотра, комнат, профилей друзей и заметок по фильмам, сериалам и аниме.
+
+![Cinema Notes preview](./cinema-app/assets/images/cinema-notes-banner.png)
 
 [Скачать APK](https://raw.githubusercontent.com/SemGAA/Program_kinp/apk-downloads/downloads/cinema-notes-android.apk) · [Релизы](https://github.com/SemGAA/Program_kinp/releases) · [Страница проекта](https://semgaa.github.io/Program_kinp/) · [Портфолио](https://semgaa.github.io/)
 
 ## Идея
 
-Cinema Notes закрывает понятный пользовательский сценарий: выбрать фильм, сериал или аниме, создать комнату, пригласить друга и обсуждать просмотр в одном месте. Приложение не заставляет держать чат, заметки и ссылку на комнату в разных местах.
+Cinema Notes закрывает понятный пользовательский сценарий: выбрать фильм, сериал или аниме, создать комнату, пригласить друга и вести обсуждение просмотра в одном месте. Приложение не заставляет держать заметки, профиль, друзей и ссылку на комнату в разных местах.
 
 ## Что внутри
 
 - Живой поиск по фильмам, сериалам, аниме, открытым видео и личной Jellyfin-медиатеке.
 - Комнаты просмотра с кодом, участниками, приглашениями друзьям и шарингом.
 - Встроенный плеер для прямых потоков, Internet Archive и Jellyfin.
-- Чат рядом с видео, чтобы обсуждение не уводило пользователя с экрана просмотра.
+- Обсуждения во время просмотра, чтобы пользователь не терял контекст комнаты и тайтла.
 - Заметки по тайтлам: впечатления, рекомендации и сохраненные мысли.
 - Профили: аватарка, никнейм, описание, друзья и публичная страница.
 - Android UI с safe-area навигацией, русской локализацией и адаптацией под клавиатуру.
 - Backend API для аккаунтов, друзей, комнат, заметок, приглашений и рекомендаций.
+
+## Мой вклад
+
+- Собрал mobile-first интерфейс на Expo Router: навигация, профиль, комнаты просмотра, состояния авторизации и адаптация под Android.
+- Разделил продукт на клиент, Laravel API, Cloudflare Worker-эксперименты, документацию и release notes.
+- Оформил безопасную политику источников: приложение не подключает пиратские балансеры и работает с легальными или личными потоками.
+- Подготовил проект для портфолио: README, GitHub Pages, APK-релизы, changelog и проверки качества.
 
 ## Архитектура
 
@@ -34,6 +43,14 @@ cloudflare-worker/   Lightweight API variant for edge/runtime experiments
 docs/                GitHub Pages product page
 release-notes/       Release texts for GitHub Releases
 ```
+
+## Технические детали
+
+- Mobile: Expo `~54.0.33`, React Native `0.81.5`, React `19.1.0`, TypeScript `~5.9.2`.
+- Backend: PHP `^8.2`, Laravel `^12.0`, Sanctum `^4.3`, Reverb `^1.0`, PHPUnit `^11.5`.
+- Data layer: Laravel migrations/models for accounts, rooms, friends, notes, invitations and catalog data.
+- Runtime: Cloudflare Worker is kept as a lightweight edge/API experiment beside the main Laravel backend.
+- Release flow: stable/beta tags, APK artifacts, changelog and GitHub Releases.
 
 ## Источники видео и безопасность
 
@@ -54,6 +71,13 @@ Cinema Notes не подключает пиратские балансеры. К
 - Есть работа с API, внешними каталогами, fallback-сценариями и ошибками сети.
 - Есть релизный контур: changelog, beta/stable tags, GitHub Releases и APK.
 - Код разделен на клиент, backend, worker и документацию.
+- Видно личный вклад: от UI и архитектуры до приватности, документации и публикации.
+
+## Проверки
+
+- `cinema-app`: `npm run lint`, `npx tsc --noEmit`.
+- `cinema-backend`: `php artisan test`.
+- Privacy pass: `.env`, build artifacts, временные файлы и личные данные не публикуются.
 
 ## Быстрый старт
 
