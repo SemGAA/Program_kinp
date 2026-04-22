@@ -1,5 +1,5 @@
-import type { MediaType, MovieSearchResult } from '@/types/app';
 import { findBestJellyfinPlaybackMatch } from '@/lib/jellyfin';
+import type { MediaType, MovieSearchResult } from '@/types/app';
 
 type ResolveAutoVideoSourceInput = {
   mediaType: MediaType;
@@ -58,6 +58,12 @@ function normalizeVideoUrl(value: string) {
   return trimmed;
 }
 
+function hashStringToNumber(value: string) {
+  return value
+    .split('')
+    .reduce((accumulator, character) => (accumulator * 31 + character.charCodeAt(0)) >>> 0, 0);
+}
+
 function buildExternalVideoResult(query: string): MovieSearchResult[] {
   const trimmedQuery = String(query || '').trim();
   if (!isValidUrl(trimmedQuery)) {
@@ -70,12 +76,11 @@ function buildExternalVideoResult(query: string): MovieSearchResult[] {
   if (youtubeId) {
     return [
       {
-        id: youtubeId
-          .split('')
-          .reduce((accumulator, character) => (accumulator * 31 + character.charCodeAt(0)) >>> 0, 0),
+        id: hashStringToNumber(youtubeId),
         mediaLabel: 'Видео',
         mediaType: 'movie',
-        overview: 'Источник добавлен по ссылке. Это видео с YouTube, а не встроенный каталог фильма или аниме.',
+        overview:
+          'Источник добавлен по ссылке. Это видео с YouTube, а не встроенный каталог фильма или аниме.',
         posterPath: null,
         posterUrl: `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg`,
         rating: null,
@@ -97,9 +102,7 @@ function buildExternalVideoResult(query: string): MovieSearchResult[] {
 
     return [
       {
-        id: normalizedUrl
-          .split('')
-          .reduce((accumulator, character) => (accumulator * 31 + character.charCodeAt(0)) >>> 0, 0),
+        id: hashStringToNumber(normalizedUrl),
         mediaLabel: 'Видео',
         mediaType: 'movie',
         overview: isDirectVideo

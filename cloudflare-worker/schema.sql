@@ -2,6 +2,14 @@ CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   email TEXT NOT NULL UNIQUE,
+  username TEXT UNIQUE,
+  bio TEXT NOT NULL DEFAULT '',
+  avatar_url TEXT,
+  avatar_theme TEXT NOT NULL DEFAULT 'sunset',
+  email_verified_at TEXT,
+  email_verification_code_hash TEXT,
+  email_verification_sent_at TEXT,
+  email_verification_expires_at TEXT,
   password_hash TEXT NOT NULL,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
@@ -96,6 +104,7 @@ CREATE TABLE IF NOT EXISTS watch_room_invites (
 CREATE INDEX IF NOT EXISTS idx_friendships_status ON friendships(status);
 CREATE INDEX IF NOT EXISTS idx_notes_user ON notes(user_id);
 CREATE INDEX IF NOT EXISTS idx_notes_sent_to ON notes(sent_to);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_watch_rooms_host ON watch_rooms(host_user_id);
 CREATE INDEX IF NOT EXISTS idx_watch_room_members_room ON watch_room_members(watch_room_id);
 CREATE INDEX IF NOT EXISTS idx_watch_room_members_user ON watch_room_members(user_id);

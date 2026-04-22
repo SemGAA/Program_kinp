@@ -1,7 +1,16 @@
 import { useCallback, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
+import { AvatarBadge } from '@/components/avatar-badge';
 import { AppShell, sharedStyles } from '@/components/app-shell';
 import { AppColors } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
@@ -11,18 +20,23 @@ import {
   getFriendRequests,
   getFriends,
   rejectFriendRequest,
+  removeFriend,
+  searchUsers,
   sendFriendRequest,
 } from '@/lib/api';
 import { formatShortDate } from '@/lib/format';
-import type { Friend, FriendRequestsPayload } from '@/types/app';
+import type { Friend, FriendRequestsPayload, UserSearchResult } from '@/types/app';
 
 export default function FriendsScreen() {
+  const router = useRouter();
   const { refreshUser, token } = useAuth();
-  const [email, setEmail] = useState('');
+  const [query, setQuery] = useState('');
   const [friends, setFriends] = useState<Friend[]>([]);
   const [requests, setRequests] = useState<FriendRequestsPayload>({ incoming: [], outgoing: [] });
+  const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSearching, setIsSearching] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -34,7 +48,10 @@ export default function FriendsScreen() {
     setError(null);
 
     try {
-      const [friendsPayload, requestsPayload] = await Promise.all([getFriends(token), getFriendRequests(token)]);
+      const [friendsPayload, requestsPayload] = await Promise.all([
+        getFriends(token),
+        getFriendRequests(token),
+      ]);
       setFriends(friendsPayload);
       setRequests(requestsPayload);
     } catch (caughtError) {
@@ -51,13 +68,32 @@ export default function FriendsScreen() {
     }, [loadData]),
   );
 
-  const handleSendRequest = async () => {
+  const handleSearch = async () => {
     if (!token) {
       return;
     }
 
-    if (!email.trim()) {
-      setError('Введите email пользователя.');
+    if (query.trim().length < 2) {
+      setError('Введите хотя бы 2 символа для поиска.');
+      return;
+    }
+
+    setIsSearching(true);
+    setError(null);
+
+    try {
+      const payload = await searchUsers(query.trim(), token);
+      setSearchResults(payload);
+    } catch (caughtError) {
+      setError(caughtError instanceof ApiError ? caughtError.message : 'Не удалось выполнить поиск.');
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleSendRequest = async (identifier: string) => {
+    if (!token) {
       return;
     }
 
@@ -65,12 +101,12 @@ export default function FriendsScreen() {
     setError(null);
 
     try {
-      await sendFriendRequest(email.trim(), token);
-      setEmail('');
+      await sendFriendRequest(identifier, token);
+      await refreshUser();
       await loadData();
+      await handleSearch();
     } catch (caughtError) {
-      const message = caughtError instanceof ApiError ? caughtError.message : 'Не удалось отправить заявку.';
-      setError(message);
+      setError(caughtError instanceof ApiError ? caughtError.message : 'Не удалось отправить заявку.');
     } finally {
       setIsSubmitting(false);
     }
@@ -95,30 +131,128 @@ export default function FriendsScreen() {
     }
   };
 
+  const handleRemoveFriend = async (friendshipId: number) => {
+    if (!token) {
+      return;
+    }
+
+    try {
+      await removeFriend(friendshipId, token);
+      await refreshUser();
+      await loadData();
+      setSearchResults((currentValue) =>
+        currentValue.map((item) =>
+          item.relationship.friendshipId === friendshipId
+            ? {
+                ...item,
+                relationship: {
+                  friendshipId: null,
+                  status: 'none',
+                },
+              }
+            : item,
+        ),
+      );
+    } catch (caughtError) {
+        Alert.alert(
+        'Ошибка',
+        caughtError instanceof ApiError ? caughtError.message : 'Не удалось удалить друга.',
+      );
+    }
+  };
+
   return (
     <AppShell
       title="Друзья"
-      subtitle="Добавляйте друзей по email. После подтверждения можно делиться заметками и смотреть вместе.">
+      subtitle="Ищите по имени или email, открывайте публичные профили и собирайте свою компанию для просмотра.">
       <View style={[sharedStyles.card, styles.formCard]}>
-        <Text style={styles.sectionTitle}>Пригласить по email</Text>
+        <Text style={styles.sectionTitle}>Найти пользователя</Text>
         <TextInput
           autoCapitalize="none"
-          keyboardType="email-address"
-          onChangeText={setEmail}
-          placeholder="friend@example.com"
+          keyboardType="default"
+          onChangeText={setQuery}
+          placeholder="Имя пользователя или email"
           placeholderTextColor={AppColors.textSecondary}
           style={sharedStyles.input}
-          value={email}
+          value={query}
         />
-        <Pressable onPress={() => void handleSendRequest()} style={sharedStyles.primaryButton}>
-          {isSubmitting ? (
+        <View style={styles.actionRow}>
+          <Pressable onPress={() => void handleSearch()} style={[sharedStyles.primaryButton, styles.flexButton]}>
+            {isSearching ? (
             <ActivityIndicator color={AppColors.textPrimary} />
           ) : (
-            <Text style={sharedStyles.primaryButtonText}>Отправить заявку</Text>
+            <Text style={sharedStyles.primaryButtonText}>Поиск</Text>
+          )}
+          </Pressable>
+          <Pressable
+            onPress={() => void handleSendRequest(query.trim())}
+            style={[sharedStyles.secondaryButton, styles.flexButton]}>
+            {isSubmitting ? (
+            <ActivityIndicator color={AppColors.textPrimary} />
+          ) : (
+            <Text style={sharedStyles.secondaryButtonText}>Отправить заявку</Text>
           )}
         </Pressable>
+        </View>
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
       </View>
+
+      {searchResults.length > 0 ? (
+        <View style={styles.sectionBlock}>
+          <Text style={styles.sectionTitle}>Результаты поиска</Text>
+          {searchResults.map((item) => (
+            <View key={item.id} style={[sharedStyles.card, styles.personCard]}>
+              <Pressable
+                onPress={() => router.push(`/users/${item.id}`)}
+                style={styles.personHeader}>
+                <AvatarBadge
+                  avatarTheme={item.avatarTheme}
+                  avatarUrl={item.avatarUrl}
+                  label={item.name}
+                  size={54}
+                />
+                <View style={styles.personCopy}>
+                  <Text style={styles.personName}>{item.name}</Text>
+                  <Text style={sharedStyles.helperText}>
+                    {item.username ? `@${item.username}` : item.email}
+                  </Text>
+                  <Text numberOfLines={2} style={sharedStyles.helperText}>
+                    {item.bio || 'У этого профиля пока нет описания.'}
+                  </Text>
+                </View>
+              </Pressable>
+
+              {item.relationship.status === 'none' ? (
+                <Pressable
+                  onPress={() => void handleSendRequest(item.username ?? item.email)}
+                  style={sharedStyles.primaryButton}>
+                  <Text style={sharedStyles.primaryButtonText}>Добавить в друзья</Text>
+                </Pressable>
+              ) : null}
+
+              {item.relationship.status === 'friend' && item.relationship.friendshipId ? (
+                <Pressable
+                  onPress={() => void handleRemoveFriend(item.relationship.friendshipId!)}
+                  style={sharedStyles.secondaryButton}>
+                  <Text style={sharedStyles.secondaryButtonText}>Удалить из друзей</Text>
+                </Pressable>
+              ) : null}
+
+              {item.relationship.status === 'incoming_request' ? (
+                <Text style={sharedStyles.helperText}>
+                  Этот пользователь уже отправил вам заявку.
+                </Text>
+              ) : null}
+
+              {item.relationship.status === 'outgoing_request' ? (
+                <Text style={sharedStyles.helperText}>
+                  Ваша заявка уже ожидает ответа.
+                </Text>
+              ) : null}
+            </View>
+          ))}
+        </View>
+      ) : null}
 
       {isLoading ? (
         <View style={sharedStyles.card}>
@@ -131,8 +265,30 @@ export default function FriendsScreen() {
           <Text style={styles.sectionTitle}>Друзья</Text>
           {friends.map((friend) => (
             <View key={friend.id} style={[sharedStyles.card, styles.personCard]}>
-              <Text style={styles.personName}>{friend.name}</Text>
-              <Text style={sharedStyles.helperText}>{friend.email}</Text>
+              <Pressable
+                onPress={() => router.push(`/users/${friend.id}`)}
+                style={styles.personHeader}>
+                <AvatarBadge
+                  avatarTheme={friend.avatarTheme}
+                  avatarUrl={friend.avatarUrl}
+                  label={friend.name}
+                  size={54}
+                />
+                <View style={styles.personCopy}>
+                  <Text style={styles.personName}>{friend.name}</Text>
+                  <Text style={sharedStyles.helperText}>
+                    {friend.username ? `@${friend.username}` : friend.email}
+                  </Text>
+                  <Text numberOfLines={2} style={sharedStyles.helperText}>
+                    {friend.bio || 'У этого профиля пока нет описания.'}
+                  </Text>
+                </View>
+              </Pressable>
+              <Pressable
+                onPress={() => void handleRemoveFriend(friend.friendshipId)}
+                style={sharedStyles.secondaryButton}>
+                <Text style={sharedStyles.secondaryButtonText}>Удалить</Text>
+              </Pressable>
             </View>
           ))}
         </View>
@@ -143,9 +299,23 @@ export default function FriendsScreen() {
           <Text style={styles.sectionTitle}>Входящие заявки</Text>
           {requests.incoming.map((request) => (
             <View key={request.id} style={[sharedStyles.card, styles.personCard]}>
-              <Text style={styles.personName}>{request.user.name}</Text>
-              <Text style={sharedStyles.helperText}>{request.user.email}</Text>
-              <Text style={styles.metaText}>Отправлена {formatShortDate(request.createdAt)}</Text>
+              <Pressable
+                onPress={() => router.push(`/users/${request.user.id}`)}
+                style={styles.personHeader}>
+                <AvatarBadge
+                  avatarTheme={request.user.avatarTheme}
+                  avatarUrl={request.user.avatarUrl}
+                  label={request.user.name}
+                  size={54}
+                />
+                <View style={styles.personCopy}>
+                  <Text style={styles.personName}>{request.user.name}</Text>
+                  <Text style={sharedStyles.helperText}>
+                    {request.user.username ? `@${request.user.username}` : request.user.email}
+                  </Text>
+                  <Text style={styles.metaText}>Отправлено {formatShortDate(request.createdAt)}</Text>
+                </View>
+              </Pressable>
               <View style={styles.actionRow}>
                 <Pressable
                   onPress={() => void handleIncomingRequest(request.id, 'accept')}
@@ -168,9 +338,23 @@ export default function FriendsScreen() {
           <Text style={styles.sectionTitle}>Исходящие заявки</Text>
           {requests.outgoing.map((request) => (
             <View key={request.id} style={[sharedStyles.card, styles.personCard]}>
-              <Text style={styles.personName}>{request.user.name}</Text>
-              <Text style={sharedStyles.helperText}>{request.user.email}</Text>
-              <Text style={styles.metaText}>Ожидает ответа с {formatShortDate(request.createdAt)}</Text>
+              <Pressable
+                onPress={() => router.push(`/users/${request.user.id}`)}
+                style={styles.personHeader}>
+                <AvatarBadge
+                  avatarTheme={request.user.avatarTheme}
+                  avatarUrl={request.user.avatarUrl}
+                  label={request.user.name}
+                  size={54}
+                />
+                <View style={styles.personCopy}>
+                  <Text style={styles.personName}>{request.user.name}</Text>
+                  <Text style={sharedStyles.helperText}>
+                    {request.user.username ? `@${request.user.username}` : request.user.email}
+                  </Text>
+                  <Text style={styles.metaText}>Ожидает с {formatShortDate(request.createdAt)}</Text>
+                </View>
+              </Pressable>
             </View>
           ))}
         </View>
@@ -183,8 +367,8 @@ export default function FriendsScreen() {
       requests.outgoing.length === 0 ? (
         <View style={sharedStyles.card}>
           <Text style={sharedStyles.emptyText}>
-            Пока нет друзей и активных заявок. Добавьте пользователя по email, чтобы начать совместные
-            просмотры и обмен заметками.
+            Пока нет друзей или активных заявок. Найдите человека по имени или email и пригласите
+            его в вашу компанию Cinema Notes.
           </Text>
         </View>
       ) : null}
@@ -204,6 +388,7 @@ const styles = StyleSheet.create({
   },
   flexButton: {
     flex: 1,
+    minWidth: 0,
   },
   formCard: {
     gap: 12,
@@ -214,7 +399,15 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   personCard: {
-    gap: 8,
+    gap: 10,
+  },
+  personCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  personHeader: {
+    flexDirection: 'row',
+    gap: 12,
   },
   personName: {
     color: AppColors.textPrimary,

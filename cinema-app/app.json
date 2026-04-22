@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "cinema-app",
+    "name": "Cinema Notes",
     "slug": "cinema-app",
     "owner": "semga",
-    "version": "1.5.0",
+    "version": "1.5.9",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "cinemaapp",
@@ -14,8 +14,9 @@
     },
     "android": {
       "package": "com.semga.cinemanotes",
-      "versionCode": 11,
+      "versionCode": 20,
       "usesCleartextTraffic": true,
+      "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

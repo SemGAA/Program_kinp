@@ -12,10 +12,10 @@ import type { Friend, MovieNote, NotesPayload } from '@/types/app';
 type TabKey = 'own' | 'incoming';
 
 const STATUS_LABELS: Record<MovieNote['status'], string> = {
-  accepted: 'принято',
+  accepted: 'принята',
   pending: 'черновик',
-  rejected: 'отклонено',
-  sent: 'отправлено',
+  rejected: 'отклонена',
+  sent: 'отправлена',
 };
 
 export default function NotesScreen() {
@@ -40,8 +40,7 @@ export default function NotesScreen() {
       setNotes(notesPayload);
       setFriends(friendsPayload);
     } catch (caughtError) {
-      const message = caughtError instanceof ApiError ? caughtError.message : 'Не удалось загрузить заметки.';
-      setError(message);
+      setError(caughtError instanceof ApiError ? caughtError.message : 'Не удалось загрузить заметки.');
     } finally {
       setIsLoading(false);
     }
@@ -59,11 +58,11 @@ export default function NotesScreen() {
     }
 
     if (friends.length === 0) {
-      Alert.alert('Нет друзей', 'Сначала добавьте друга по email на вкладке друзей.');
+      Alert.alert('Пока нет друзей', 'Сначала добавьте друга во вкладке «Друзья».');
       return;
     }
 
-    Alert.alert('Отправить заметку', 'Выберите друга, которому хотите отправить заметку.', [
+    Alert.alert('Поделиться заметкой', 'Выберите друга, которому отправить заметку.', [
       { text: 'Отмена', style: 'cancel' },
       ...friends.slice(0, 6).map((friend) => ({
         text: friend.name,
@@ -72,9 +71,12 @@ export default function NotesScreen() {
             await shareNote(note.id, friend.id, token);
             await loadData();
           } catch (caughtError) {
-            const message =
-              caughtError instanceof ApiError ? caughtError.message : 'Не удалось отправить заметку.';
-            Alert.alert('Ошибка', message);
+            Alert.alert(
+              'Ошибка',
+              caughtError instanceof ApiError
+                ? caughtError.message
+                : 'Не удалось поделиться заметкой.',
+            );
           }
         },
       })),
@@ -94,33 +96,19 @@ export default function NotesScreen() {
       }
       await loadData();
     } catch (caughtError) {
-      const message =
-        caughtError instanceof ApiError ? caughtError.message : 'Не удалось обновить статус заметки.';
-      Alert.alert('Ошибка', message);
+      Alert.alert(
+        'Ошибка',
+        caughtError instanceof ApiError
+          ? caughtError.message
+          : 'Не удалось обновить статус заметки.',
+      );
     }
   };
 
-  const openOwnNote = (note: MovieNote) => {
+  const openNote = (note: MovieNote) => {
     router.push({
-              pathname: '/movie/[tmdbId]',
-              params: {
-                tmdbId: String(note.tmdbId),
-                mediaType: note.mediaType,
-                noteId: String(note.id),
-                initialNote: note.noteText,
-              },
-    });
-  };
-
-  const openIncomingNote = (note: MovieNote) => {
-    router.push({
-              pathname: '/movie/[tmdbId]',
-              params: {
-                tmdbId: String(note.tmdbId),
-                mediaType: note.mediaType,
-                sharedNote: note.noteText,
-                fromName: note.owner?.name ?? 'Друг',
-              },
+      pathname: '/notes/[noteId]',
+      params: { noteId: String(note.id) },
     });
   };
 
@@ -129,7 +117,7 @@ export default function NotesScreen() {
   return (
     <AppShell
       title="Заметки"
-      subtitle="Черновики — это ваши личные мысли о фильмах, а во входящих лежат заметки друзей и приглашения.">
+      subtitle="Личные черновики и рекомендации от друзей. Нажатие по заметке теперь открывает редактор заметки, а не поиск или комнату.">
       <View style={styles.tabsRow}>
         <Pressable
           onPress={() => setActiveTab('own')}
@@ -159,14 +147,14 @@ export default function NotesScreen() {
         visibleNotes.map((note) => (
           <Pressable
             key={`${activeTab}-${note.id}`}
-            onPress={() => (activeTab === 'own' ? openOwnNote(note) : openIncomingNote(note))}
+            onPress={() => openNote(note)}
             style={[sharedStyles.card, styles.noteCard]}>
             <View style={styles.noteHeader}>
               <View style={styles.noteHeading}>
                 <Text style={styles.movieTitle}>{note.movieTitle}</Text>
                 <Text style={sharedStyles.helperText}>
                   {(note.mediaType === 'tv' ? 'Сериал' : 'Фильм') +
-                    (note.releaseYear ? ` • ${note.releaseYear}` : ' • год не указан')}
+                    (note.releaseYear ? ` · ${note.releaseYear}` : ' · год неизвестен')}
                 </Text>
               </View>
               <View style={styles.statusBadge}>
@@ -180,8 +168,8 @@ export default function NotesScreen() {
 
             <Text style={styles.metaText}>
               Создано {formatShortDate(note.createdAt)}
-              {note.recipient ? ` • получатель ${note.recipient.name}` : ''}
-              {note.owner ? ` • от ${note.owner.name}` : ''}
+              {note.recipient ? ` · получатель ${note.recipient.name}` : ''}
+              {note.owner ? ` · от ${note.owner.name}` : ''}
             </Text>
 
             {activeTab === 'own' && (note.status === 'pending' || note.status === 'rejected') ? (
@@ -211,12 +199,12 @@ export default function NotesScreen() {
         <View style={sharedStyles.card}>
           <Text style={sharedStyles.emptyText}>
             {activeTab === 'own'
-              ? 'У вас пока нет заметок. Начните с поиска фильма.'
-              : 'Входящих приглашений пока нет.'}
+              ? 'У вас пока нет заметок. Начните с поиска и сохраните первое впечатление.'
+              : 'Входящих заметок пока нет.'}
           </Text>
           {activeTab === 'own' ? (
             <Pressable onPress={() => router.push('/search')} style={sharedStyles.primaryButton}>
-              <Text style={sharedStyles.primaryButtonText}>Перейти к поиску</Text>
+              <Text style={sharedStyles.primaryButtonText}>Открыть поиск</Text>
             </Pressable>
           ) : null}
         </View>
@@ -265,7 +253,7 @@ const styles = StyleSheet.create({
     backgroundColor: AppColors.cardMuted,
     borderRadius: 999,
     paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingVertical: 8,
   },
   statusBadgeText: {
     color: AppColors.textPrimary,
@@ -274,15 +262,14 @@ const styles = StyleSheet.create({
   },
   tabButton: {
     alignItems: 'center',
-    backgroundColor: AppColors.card,
+    backgroundColor: AppColors.cardMuted,
     borderColor: AppColors.border,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
     flex: 1,
     paddingVertical: 12,
   },
   tabButtonActive: {
-    backgroundColor: AppColors.cardMuted,
     borderColor: AppColors.accent,
   },
   tabText: {

@@ -6,6 +6,7 @@ const TMDB_API_BASE_URL = 'https://api.themoviedb.org/3';
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
 const TMDB_CACHE_TTL_MS = 5 * 60 * 1000;
 const TMDB_SEARCH_RESULTS_LIMIT = 16;
+const TMDB_API_KEY_FALLBACK = 'c05cabab9351fafd2b28de9c14964ab4';
 
 type TmdbMediaType = 'movie' | 'tv' | 'person';
 
@@ -25,6 +26,8 @@ type TmdbSummaryPayload = {
 type TmdbDetailsPayload = TmdbSummaryPayload & {
   episode_run_time?: number[] | null;
   genres?: Array<{ id: number; name: string }>;
+  number_of_episodes?: number | null;
+  number_of_seasons?: number | null;
   runtime?: number | null;
 };
 
@@ -50,7 +53,9 @@ function readExtraValue(key: 'tmdbApiKey' | 'tmdbReadAccessToken') {
 }
 
 const DIRECT_TMDB_API_KEY =
-  process.env.EXPO_PUBLIC_TMDB_API_KEY?.trim() || readExtraValue('tmdbApiKey');
+  process.env.EXPO_PUBLIC_TMDB_API_KEY?.trim() ||
+  readExtraValue('tmdbApiKey') ||
+  TMDB_API_KEY_FALLBACK;
 const DIRECT_TMDB_READ_ACCESS_TOKEN =
   process.env.EXPO_PUBLIC_TMDB_READ_ACCESS_TOKEN?.trim() || readExtraValue('tmdbReadAccessToken');
 
@@ -92,6 +97,9 @@ function mapSummary(item: TmdbSummaryPayload): MovieSearchResult {
     posterUrl: imageUrl(item.poster_path),
     rating: typeof item.vote_average === 'number' ? item.vote_average : null,
     releaseYear: extractYear(releaseDate),
+    sourceKind: 'catalog',
+    sourceLabel: null,
+    sourceProvider: null,
     title: item.title || item.name || 'Без названия',
   };
 }
@@ -111,8 +119,16 @@ function mapDetails(item: TmdbDetailsPayload, requestedMediaType: MediaType): Mo
     ...summary,
     backdropPath: item.backdrop_path || null,
     backdropUrl: imageUrl(item.backdrop_path),
+    episodeCount:
+      requestedMediaType === 'tv' && Number.isFinite(item.number_of_episodes)
+        ? Number(item.number_of_episodes)
+        : null,
     genres: (item.genres ?? []).map((genre) => genre.name).filter(Boolean),
     runtime,
+    seasonCount:
+      requestedMediaType === 'tv' && Number.isFinite(item.number_of_seasons)
+        ? Number(item.number_of_seasons)
+        : null,
   };
 }
 
@@ -139,7 +155,7 @@ function writeCache<T>(cache: Map<string, CacheEntry<T>>, key: string, value: T)
 
 async function fetchWithTimeout(url: string, init: RequestInit) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
+  const timeout = setTimeout(() => controller.abort(), 12000);
 
   try {
     return await fetch(url, {

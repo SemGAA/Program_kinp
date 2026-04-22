@@ -30,29 +30,8 @@ import { formatRuntime } from '@/lib/format';
 import { resolveAutoVideoSource } from '@/lib/auto-video';
 import type { Friend, MediaType, MovieDetails, MovieRecommendation } from '@/types/app';
 
-const DEMO_VIDEO_URL = 'https://vjs.zencdn.net/v/oceans.mp4';
-
 function readParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
-}
-
-function isDirectVideoUrl(value: string) {
-  const trimmed = String(value || '').trim();
-
-  if (!trimmed) {
-    return false;
-  }
-
-  try {
-    const parsed = new URL(trimmed);
-    if (!/^https?:$/i.test(parsed.protocol)) {
-      return false;
-    }
-
-    return /\.(mp4|m3u8|webm|mov|m4v)(?:$|[?#])/i.test(parsed.pathname);
-  } catch {
-    return false;
-  }
 }
 
 export default function MovieDetailsScreen() {
@@ -123,7 +102,6 @@ export default function MovieDetailsScreen() {
   const [movie, setMovie] = useState<MovieDetails | null>(initialMovie);
   const [noteId, setNoteId] = useState<number | null>(initialNoteId);
   const [noteText, setNoteText] = useState(initialOwnNote ?? '');
-  const [videoUrl, setVideoUrl] = useState(initialVideoUrl);
   const [recommendations, setRecommendations] = useState<MovieRecommendation[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(!initialMovie);
@@ -302,29 +280,16 @@ export default function MovieDetailsScreen() {
     setInvitingFriendId(friend?.id ?? null);
 
     try {
-      let resolvedVideoUrl = videoUrl.trim();
+      let resolvedVideoUrl = initialVideoUrl;
 
-      if (!resolvedVideoUrl) {
-        const autoResolved = await resolveAutoVideoSource({
-          mediaType: movie.mediaType,
-          releaseYear: movie.releaseYear,
-          title: movie.title,
-        });
+      const autoResolved = await resolveAutoVideoSource({
+        mediaType: movie.mediaType,
+        releaseYear: movie.releaseYear,
+        title: movie.title,
+      });
 
-        if (autoResolved) {
-          resolvedVideoUrl = autoResolved;
-          setVideoUrl(autoResolved);
-        }
-      }
-
-      if (!resolvedVideoUrl) {
-        Alert.alert('Нужна ссылка', 'Не нашли встроенный поток автоматически. Вставьте прямую ссылку на видео mp4, m3u8, webm или mov.');
-        return;
-      }
-
-      if (!isDirectVideoUrl(resolvedVideoUrl)) {
-        Alert.alert('Неподдерживаемая ссылка', 'Для встроенного просмотра сейчас нужен прямой mp4, webm, mov или m3u8 поток.');
-        return;
+      if (autoResolved) {
+        resolvedVideoUrl = autoResolved;
       }
 
       const room = await createWatchRoom(
@@ -333,8 +298,7 @@ export default function MovieDetailsScreen() {
           media_type: movie.mediaType,
           poster_path: movie.posterPath,
           release_year: movie.releaseYear,
-          tmdb_id: movie.id,
-          video_url: resolvedVideoUrl,
+          ...(resolvedVideoUrl ? { video_url: resolvedVideoUrl } : { tmdb_id: movie.id }),
         },
         token,
       );
@@ -382,7 +346,7 @@ export default function MovieDetailsScreen() {
   return (
     <AppShell
       title={movie?.title ?? 'Карточка тайтла'}
-      subtitle="Сохраняйте заметки, подбирайте похожее и открывайте комнату совместного просмотра по прямой ссылке на видео.">
+      subtitle="Сохраняйте заметки, подбирайте похожее и открывайте комнату совместного просмотра без ручного ввода ссылки.">
       {isLoading ? (
         <View style={sharedStyles.card}>
           <ActivityIndicator color={AppColors.accent} />
@@ -481,24 +445,9 @@ export default function MovieDetailsScreen() {
           <View style={[sharedStyles.card, styles.roomCard]}>
             <Text style={styles.sectionTitle}>Комната совместного просмотра</Text>
             <Text style={sharedStyles.helperText}>
-              Для синхронного просмотра используется встроенный плеер с прямыми mp4, webm, mov или m3u8 потоками. Если поле пустое, приложение попробует найти поток автоматически.
+              Приложение само попробует подключить встроенный источник для этого тайтла. Если он уже есть в вашей библиотеке Jellyfin, комната откроется сразу для синхронного просмотра без ручной вставки ссылки.
             </Text>
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              onChangeText={setVideoUrl}
-              placeholder="https://example.com/video.mp4 или оставьте пустым для авто-поиска"
-              placeholderTextColor={AppColors.textSecondary}
-              style={sharedStyles.input}
-              value={videoUrl}
-            />
             <View style={styles.actionRow}>
-              <Pressable
-                onPress={() => setVideoUrl(DEMO_VIDEO_URL)}
-                style={[sharedStyles.secondaryButton, styles.flexButton]}>
-                <Text style={sharedStyles.secondaryButtonText}>Подставить демо</Text>
-              </Pressable>
               <Pressable
                 onPress={() => void createRoomWithOptionalInvite()}
                 style={[sharedStyles.primaryButton, styles.flexButton]}>

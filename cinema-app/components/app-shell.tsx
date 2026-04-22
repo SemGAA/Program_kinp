@@ -1,5 +1,6 @@
 import { PropsWithChildren, ReactNode } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BottomNav } from '@/components/bottom-nav';
 import { AppColors } from '@/constants/theme';
@@ -12,15 +13,15 @@ type AppShellProps = PropsWithChildren<{
 
 export function AppShell({ children, footer, subtitle, title }: AppShellProps) {
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <Text style={styles.title}>{title}</Text>
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
         </View>
         {children}
       </ScrollView>
-      {footer ?? <BottomNav />}
+      {footer === undefined ? <BottomNav /> : footer}
     </SafeAreaView>
   );
 }
@@ -75,6 +76,8 @@ export const sharedStyles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: AppColors.accent,
     borderRadius: 18,
+    justifyContent: 'center',
+    minHeight: 52,
     paddingHorizontal: 18,
     paddingVertical: 14,
   },
@@ -82,6 +85,7 @@ export const sharedStyles = StyleSheet.create({
     color: AppColors.textPrimary,
     fontSize: 15,
     fontWeight: '700',
+    textAlign: 'center',
   },
   secondaryButton: {
     alignItems: 'center',
@@ -89,6 +93,8 @@ export const sharedStyles = StyleSheet.create({
     borderColor: AppColors.border,
     borderRadius: 18,
     borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 52,
     paddingHorizontal: 18,
     paddingVertical: 14,
   },
@@ -96,13 +102,14 @@ export const sharedStyles = StyleSheet.create({
     color: AppColors.textPrimary,
     fontSize: 15,
     fontWeight: '700',
+    textAlign: 'center',
   },
 });
 
 const styles = StyleSheet.create({
   content: {
     gap: 18,
-    paddingBottom: 32,
+    paddingBottom: 42,
     paddingHorizontal: 18,
     paddingTop: 18,
   },
@@ -124,4 +131,3 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 });
-

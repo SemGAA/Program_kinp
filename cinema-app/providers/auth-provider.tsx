@@ -13,24 +13,31 @@ import {
   loginUser,
   logoutUser,
   registerUser,
+  resendRegistrationCode as resendRegistrationCodeRequest,
+  verifyRegistrationCode as verifyRegistrationCodeRequest,
 } from '@/lib/api';
 import { clearStoredToken, getStoredToken, setStoredToken } from '@/lib/session-storage';
-import type { AuthUser } from '@/types/app';
+import type { AuthUser, RegistrationChallenge } from '@/types/app';
 
 type AuthContextValue = {
+  clearPendingVerification: () => void;
   isLoading: boolean;
   isSignedIn: boolean;
+  pendingVerification: RegistrationChallenge | null;
+  resendVerificationCode: (email: string) => Promise<RegistrationChallenge>;
   signIn: (payload: { email: string; password: string }) => Promise<void>;
   signOut: () => Promise<void>;
-  signUp: (payload: { email: string; name: string; password: string }) => Promise<void>;
+  signUp: (payload: { email: string; name: string; password: string }) => Promise<RegistrationChallenge>;
   token: string | null;
   user: AuthUser | null;
   refreshUser: () => Promise<void>;
+  verifyRegistrationCode: (payload: { code: string; email: string }) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: PropsWithChildren) {
+  const [pendingVerification, setPendingVerification] = useState<RegistrationChallenge | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -40,15 +47,18 @@ export function AuthProvider({ children }: PropsWithChildren) {
       const storedToken = await getStoredToken();
 
       if (!storedToken) {
+        setPendingVerification(null);
         setToken(null);
         setUser(null);
         return;
       }
 
       const currentUser = await getCurrentUser(storedToken);
+      setPendingVerification(null);
       setToken(storedToken);
       setUser(currentUser);
     } catch {
+      setPendingVerification(null);
       setToken(null);
       setUser(null);
       await clearStoredToken();
@@ -62,6 +72,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [bootstrap]);
 
   const persistSession = useCallback(async (nextToken: string, nextUser: AuthUser) => {
+    setPendingVerification(null);
     setToken(nextToken);
     setUser(nextUser);
     await setStoredToken(nextToken);
@@ -77,15 +88,31 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const signUp = useCallback(
     async (payload: { email: string; name: string; password: string }) => {
-      const session = await registerUser(payload);
+      const challenge = await registerUser(payload);
+      setPendingVerification(challenge);
+      return challenge;
+    },
+    [],
+  );
+
+  const verifyRegistration = useCallback(
+    async (payload: { code: string; email: string }) => {
+      const session = await verifyRegistrationCodeRequest(payload);
       await persistSession(session.access_token, session.user);
     },
     [persistSession],
   );
 
+  const resendVerificationCode = useCallback(async (email: string) => {
+    const challenge = await resendRegistrationCodeRequest(email);
+    setPendingVerification(challenge);
+    return challenge;
+  }, []);
+
   const signOut = useCallback(async () => {
     const currentToken = token;
 
+    setPendingVerification(null);
     setToken(null);
     setUser(null);
     await clearStoredToken();
@@ -110,16 +137,31 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const value = useMemo<AuthContextValue>(
     () => ({
+      clearPendingVerification: () => setPendingVerification(null),
       isLoading,
       isSignedIn: !!token && !!user,
+      pendingVerification,
+      resendVerificationCode,
       signIn,
       signOut,
       signUp,
       token,
       user,
       refreshUser,
+      verifyRegistrationCode: verifyRegistration,
     }),
-    [isLoading, signIn, signOut, signUp, token, user, refreshUser],
+    [
+      isLoading,
+      pendingVerification,
+      resendVerificationCode,
+      signIn,
+      signOut,
+      signUp,
+      token,
+      user,
+      refreshUser,
+      verifyRegistration,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -134,4 +176,3 @@ export function useAuthContext() {
 
   return context;
 }
-

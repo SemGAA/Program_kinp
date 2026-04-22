@@ -6,7 +6,7 @@ import type { MediaType, MovieSearchResult } from '@/types/app';
 const JELLYFIN_CONNECTION_KEY = 'cinema_app_jellyfin_connection';
 const DEVICE_ID = 'cinema-notes-mobile';
 const CLIENT_NAME = 'Cinema Notes';
-const APP_VERSION = '1.5.3';
+const APP_VERSION = '1.5.9';
 const REQUEST_TIMEOUT_MS = 15000;
 
 type JellyfinStoredConnection = {

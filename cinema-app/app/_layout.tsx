@@ -1,7 +1,8 @@
 import { DarkTheme, ThemeProvider, type Theme } from '@react-navigation/native';
+import * as ExpoLinking from 'expo-linking';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 
 import { LoadingScreen } from '@/components/loading-screen';
@@ -26,11 +27,58 @@ const navigationTheme: Theme = {
   },
 };
 
+function extractWatchRoomCodeFromUrl(urlValue: string | null) {
+  if (!urlValue) {
+    return null;
+  }
+
+  try {
+    const url = new URL(urlValue);
+
+    if (url.protocol === 'cinemaapp:' && url.hostname === 'watch') {
+      return url.pathname.replace(/^\/+/, '').trim().toUpperCase() || null;
+    }
+
+    const webMatch = `${url.hostname}${url.pathname}`.match(/\/watch\/([^/?#]+)/i);
+    return webMatch?.[1]?.trim().toUpperCase() || null;
+  } catch {
+    return null;
+  }
+}
+
 function RootNavigator() {
   const { isLoading, isSignedIn } = useAuth();
   const router = useRouter();
   const segments = useSegments();
   const inAuthFlow = segments[0] === 'auth';
+  const [pendingWatchCode, setPendingWatchCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    void ExpoLinking.getInitialURL().then((urlValue) => {
+      if (!isMounted) {
+        return;
+      }
+
+      const roomCode = extractWatchRoomCodeFromUrl(urlValue);
+      if (roomCode) {
+        setPendingWatchCode(roomCode);
+      }
+    });
+
+    const subscription = ExpoLinking.addEventListener('url', ({ url }) => {
+      const roomCode = extractWatchRoomCodeFromUrl(url);
+      if (roomCode) {
+        setPendingWatchCode(roomCode);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.remove();
+    };
+  }, []);
 
   useEffect(() => {
     if (isLoading) {
@@ -46,6 +94,20 @@ function RootNavigator() {
       router.replace('/');
     }
   }, [inAuthFlow, isLoading, isSignedIn, router]);
+
+  useEffect(() => {
+    if (!isSignedIn || !pendingWatchCode) {
+      return;
+    }
+
+    router.replace({
+      pathname: '/watch/[code]',
+      params: {
+        code: pendingWatchCode,
+      },
+    });
+    setPendingWatchCode(null);
+  }, [isSignedIn, pendingWatchCode, router]);
 
   if (isLoading) {
     return <LoadingScreen label="Проверяем сессию..." />;

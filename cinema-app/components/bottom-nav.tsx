@@ -1,6 +1,14 @@
-import { Compass, House, NotebookPen, PlaySquare, Users, type LucideIcon } from 'lucide-react-native';
+import {
+  Compass,
+  House,
+  NotebookPen,
+  PlaySquare,
+  Users,
+  type LucideIcon,
+} from 'lucide-react-native';
 import { usePathname, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppColors } from '@/constants/theme';
 
@@ -21,9 +29,10 @@ const NAV_ITEMS: NavItem[] = [
 export function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   return (
-    <View style={styles.wrapper}>
+    <View style={[styles.wrapper, { paddingBottom: Math.max(insets.bottom, 10) + 8 }]}>
       {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
         const isActive = pathname === href || pathname.startsWith(`${href}/`);
 
@@ -49,16 +58,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'space-between',
-    paddingBottom: 16,
+    paddingBottom: 18,
     paddingHorizontal: 12,
-    paddingTop: 12,
+    paddingTop: 10,
   },
   item: {
     alignItems: 'center',
     borderRadius: 16,
     flex: 1,
     gap: 6,
-    paddingVertical: 10,
+    paddingVertical: 8,
   },
   itemActive: {
     backgroundColor: AppColors.cardMuted,

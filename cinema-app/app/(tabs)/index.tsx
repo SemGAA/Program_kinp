@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { AvatarBadge } from '@/components/avatar-badge';
 import { AppShell, sharedStyles } from '@/components/app-shell';
 import { AppColors } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
@@ -12,57 +13,82 @@ export default function HomeScreen() {
   return (
     <AppShell
       title="Cinema Notes"
-      subtitle="Поиск фильмов, сериалов, аниме и дорам, совместный просмотр по комнате и заметки прямо во время сеанса.">
+      subtitle="Находите фильмы и аниме, создавайте комнату за секунды, приглашайте друзей и переписывайтесь рядом с видео.">
       <View style={[sharedStyles.card, styles.heroCard]}>
         <View style={styles.heroHeader}>
-          <View style={styles.heroCopy}>
-            <Text style={styles.eyebrow}>MVP</Text>
-            <Text style={styles.heroTitle}>{user ? `Привет, ${user.name}` : 'Привет'}</Text>
+          <View style={styles.heroIdentity}>
+            <AvatarBadge
+              avatarTheme={user?.avatarTheme}
+              avatarUrl={user?.avatarUrl}
+              label={user?.name ?? 'U'}
+              size={56}
+            />
+            <View style={styles.heroCopy}>
+              <Text style={styles.eyebrow}>Cinema Notes</Text>
+              <Text style={styles.heroTitle}>
+                {user ? `Привет, ${user.name}` : 'Добро пожаловать'}
+              </Text>
+              <Text style={sharedStyles.helperText}>
+                {user?.username
+                  ? `@${user.username}`
+                  : 'Публичный профиль можно настроить в любой момент.'}
+              </Text>
+            </View>
           </View>
           <Pressable onPress={() => router.push('/profile')} style={styles.profileButton}>
             <Text style={styles.profileButtonText}>Профиль</Text>
           </Pressable>
         </View>
         <Text style={sharedStyles.helperText}>
-          Найдите фильм в каталоге, откройте карточку, создайте комнату просмотра и отправьте другу код
-          комнаты. Для синхронного просмотра нужен прямой видео-URL, например mp4 или m3u8.
+          Самый быстрый путь: откройте поиск, выберите фильм или сериал и создайте комнату одним
+          нажатием.
         </Text>
       </View>
 
       <View style={styles.statsRow}>
         <View style={[sharedStyles.card, styles.statCard]}>
           <Text style={styles.statValue}>{user?.stats.notes ?? 0}</Text>
-          <Text style={styles.statLabel}>заметок</Text>
+          <Text style={styles.statLabel}>заметки</Text>
         </View>
         <View style={[sharedStyles.card, styles.statCard]}>
           <Text style={styles.statValue}>{user?.stats.friends ?? 0}</Text>
-          <Text style={styles.statLabel}>друзей</Text>
+          <Text style={styles.statLabel}>друзья</Text>
+        </View>
+        <View style={[sharedStyles.card, styles.statCard]}>
+          <Text style={styles.statValue}>{user?.stats.rooms ?? 0}</Text>
+          <Text style={styles.statLabel}>комнаты</Text>
         </View>
       </View>
 
       <View style={styles.actionGrid}>
-        <Pressable onPress={() => router.push('/search')} style={[sharedStyles.card, styles.actionCard]}>
-          <Text style={styles.actionTitle}>Найти фильм</Text>
+        <Pressable onPress={() => router.push('/catalog')} style={[sharedStyles.card, styles.actionCard]}>
+          <Text style={styles.actionTitle}>Каталог</Text>
           <Text style={sharedStyles.helperText}>
-            Поиск по каталогу фильмов, сериалов, дорам, аниме и мультсериалов, заметки и создание комнаты просмотра из карточки.
+            Быстрые разделы: аниме, фильмы, сериалы, открытые видео и подключение Jellyfin.
+          </Text>
+        </Pressable>
+        <Pressable onPress={() => router.push('/search')} style={[sharedStyles.card, styles.actionCard]}>
+          <Text style={styles.actionTitle}>Поиск</Text>
+          <Text style={sharedStyles.helperText}>
+            Вводите название, варианты появляются автоматически без кнопки поиска.
           </Text>
         </Pressable>
         <Pressable onPress={() => router.push('/watch')} style={[sharedStyles.card, styles.actionCard]}>
-          <Text style={styles.actionTitle}>Комнаты просмотра</Text>
+          <Text style={styles.actionTitle}>Мои комнаты</Text>
           <Text style={sharedStyles.helperText}>
-            Войти по коду, открыть уже созданную комнату или быстро поднять демо-комнату для проверки.
-          </Text>
-        </Pressable>
-        <Pressable onPress={() => router.push('/notes')} style={[sharedStyles.card, styles.actionCard]}>
-          <Text style={styles.actionTitle}>Мои заметки</Text>
-          <Text style={sharedStyles.helperText}>
-            Сохраняйте впечатления о фильмах и делитесь ими с друзьями в приложении.
+            Здесь собраны активные комнаты, приглашения, коды и быстрые входы.
           </Text>
         </Pressable>
         <Pressable onPress={() => router.push('/friends')} style={[sharedStyles.card, styles.actionCard]}>
-          <Text style={styles.actionTitle}>Друзья</Text>
+          <Text style={styles.actionTitle}>Друзья и профили</Text>
           <Text style={sharedStyles.helperText}>
-            Добавляйте друзей по email и используйте их для совместных просмотров и обмена заметками.
+            Ищите людей, открывайте профили и собирайте свою компанию для совместного просмотра.
+          </Text>
+        </Pressable>
+        <Pressable onPress={() => router.push('/notes')} style={[sharedStyles.card, styles.actionCard]}>
+          <Text style={styles.actionTitle}>Заметки о просмотре</Text>
+          <Text style={sharedStyles.helperText}>
+            Сохраняйте впечатления, делитесь заметками и держите любимые фильмы под рукой.
           </Text>
         </Pressable>
       </View>
@@ -95,13 +121,15 @@ const styles = StyleSheet.create({
   },
   heroCopy: {
     flex: 1,
-    gap: 6,
+    gap: 4,
   },
   heroHeader: {
+    gap: 12,
+  },
+  heroIdentity: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: 12,
-    justifyContent: 'space-between',
   },
   heroTitle: {
     color: AppColors.textPrimary,
@@ -109,6 +137,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   profileButton: {
+    alignSelf: 'flex-start',
     backgroundColor: AppColors.cardMuted,
     borderColor: AppColors.border,
     borderRadius: 16,
@@ -137,6 +166,6 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
   },
 });
