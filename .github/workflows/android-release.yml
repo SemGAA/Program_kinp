@@ -1,0 +1,75 @@
+name: Publish Android Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@v4
+
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          notes="release-notes/${tag}.md"
+          if [[ ! -f "$notes" ]]; then
+            notes="CHANGELOG.md"
+          fi
+          prerelease="false"
+          if [[ "$tag" == *"-beta."* || "$tag" == *"-alpha."* || "$tag" == *"-rc."* ]]; then
+            prerelease="true"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "notes=$notes" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+
+      - name: Download APK from apk-downloads branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          base_url="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/apk-downloads/downloads"
+          version="${{ steps.meta.outputs.version }}"
+          apk_path="release-assets/Cinema-Notes-${{ steps.meta.outputs.tag }}.apk"
+          for name in "cinema-notes-android-${version}.apk" "cinema-notes-android.apk"; do
+            if curl -fL "$base_url/$name" -o "$apk_path"; then
+              echo "APK downloaded from $name"
+              exit 0
+            fi
+          done
+          echo "No APK found on apk-downloads branch" >&2
+          exit 1
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(
+            "${{ steps.meta.outputs.tag }}"
+            "release-assets/Cinema-Notes-${{ steps.meta.outputs.tag }}.apk"
+            "--title"
+            "Cinema Notes ${{ steps.meta.outputs.tag }}"
+            "--notes-file"
+            "${{ steps.meta.outputs.notes }}"
+            "--verify-tag"
+          )
+          if [[ "${{ steps.meta.outputs.prerelease }}" == "true" ]]; then
+            args+=("--prerelease")
+          fi
+          gh release create "${args[@]}"

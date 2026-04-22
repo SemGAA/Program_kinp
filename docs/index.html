@@ -3,67 +3,131 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Cinema Notes</title>
+    <title>Cinema Notes — совместный просмотр на Android</title>
     <meta
       name="description"
-      content="Cinema Notes — Android-приложение для совместного просмотра, заметок, друзей, профилей и чата рядом с видео."
+      content="Cinema Notes — мобильное приложение для совместного просмотра, заметок, профилей и чата рядом с видео."
     />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main class="page">
+    <header class="topbar" aria-label="Навигация">
+      <a class="brand" href="#top">Cinema Notes</a>
+      <nav class="nav">
+        <a href="#inside">Внутри</a>
+        <a href="#sources">Источники</a>
+        <a href="#releases">Релизы</a>
+      </nav>
+    </header>
+
+    <main id="top">
       <section class="hero">
-        <div class="hero__copy">
-          <p class="eyebrow">Android app</p>
-          <h1>Cinema Notes</h1>
+        <div class="hero__content">
+          <p class="eyebrow">Android · watch parties · notes</p>
+          <h1>Смотреть вместе должно быть проще.</h1>
           <p class="lead">
-            Зашёл, нашёл фильм или аниме, создал комнату, пригласил друга и обсуждаешь просмотр в чате рядом с видео.
+            Cinema Notes собирает поиск, комнату, чат, друзей и заметки в один спокойный мобильный сценарий: нашёл тайтл, создал комнату, отправил приглашение и смотришь вместе.
           </p>
           <div class="hero__actions">
             <a class="button button--primary" href="https://raw.githubusercontent.com/SemGAA/Program_kinp/apk-downloads/downloads/cinema-notes-android.apk">
               Скачать APK
             </a>
-            <a class="button" href="https://github.com/SemGAA/Program_kinp">
-              Открыть GitHub
+            <a class="button" href="https://github.com/SemGAA/Program_kinp/releases">
+              История версий
             </a>
           </div>
         </div>
-        <div class="phone-card" aria-label="Экран приложения Cinema Notes">
-          <div class="phone-card__top">Cinema Notes</div>
-          <div class="phone-card__video">Плеер</div>
-          <div class="phone-card__chat">
-            <span>Мяка: чат рядом с видео</span>
-            <span>Сёма: комната готова</span>
-            <span>Вы: смотрим вместе</span>
+
+        <div class="device" aria-label="Макет экрана Cinema Notes">
+          <div class="device__status">
+            <span>20:26</span>
+            <span>CN</span>
+          </div>
+          <div class="device__screen">
+            <div class="device__title">Наруто</div>
+            <div class="device__player">Встроенный плеер</div>
+            <div class="device__meta">Код комнаты · 4F8KQ2</div>
+            <div class="device__chat">
+              <p><strong>Мяка</strong> Чат рядом с видео, не мешает просмотру.</p>
+              <p><strong>Сёма</strong> Отправил приглашение, заходи по ссылке.</p>
+              <p><strong>Вы</strong> Сохранил момент в заметки.</p>
+            </div>
           </div>
         </div>
       </section>
 
-      <section class="grid" aria-label="Возможности">
-        <article class="card">
-          <h2>Живой поиск</h2>
-          <p>Вводите название, а варианты появляются автоматически: фильмы, сериалы, аниме, открытые видео и личная медиатека Jellyfin.</p>
-        </article>
-        <article class="card">
-          <h2>Комнаты</h2>
-          <p>Комнаты создаются без ручного ввода источника, если найден встроенный легальный поток. Есть код, приглашения и шаринг.</p>
-        </article>
-        <article class="card">
-          <h2>Чат и заметки</h2>
-          <p>Чат находится рядом с просмотром, а заметки открываются отдельным редактором и больше не ведут в поиск.</p>
-        </article>
-        <article class="card">
-          <h2>Профили</h2>
-          <p>Аватарки, никнейм, описание профиля, друзья, публичные страницы и удобная нижняя навигация под Android.</p>
-        </article>
+      <section id="inside" class="section section--split">
+        <div>
+          <p class="eyebrow">Что внутри</p>
+          <h2>Приложение для вечера, а не набор разрозненных кнопок.</h2>
+        </div>
+        <div class="feature-list">
+          <article>
+            <span>01</span>
+            <h3>Живой поиск</h3>
+            <p>Варианты появляются во время ввода: фильмы, сериалы, аниме, открытые видео и личная Jellyfin-библиотека.</p>
+          </article>
+          <article>
+            <span>02</span>
+            <h3>Комнаты просмотра</h3>
+            <p>Комната создаётся с кодом, приглашением, участниками, синхронизацией прямого потока и быстрым шарингом.</p>
+          </article>
+          <article>
+            <span>03</span>
+            <h3>Чат рядом с видео</h3>
+            <p>Сообщения остаются рядом с просмотром, а последние реплики могут появляться поверх видео аккуратной подсказкой.</p>
+          </article>
+          <article>
+            <span>04</span>
+            <h3>Профили и заметки</h3>
+            <p>Аватарки, никнейм, описание, друзья, публичные профили и отдельный редактор заметок по фильмам.</p>
+          </article>
+        </div>
       </section>
 
-      <section class="notice">
-        <h2>Как работает видео</h2>
-        <p>
-          Cinema Notes не использует пиратские балансеры. Встроенный плеер поддерживает Internet Archive, прямые видеофайлы и вашу личную Jellyfin-библиотеку. Если у карточки нет легального потока, приложение не открывает пустой плеер и предлагает подключить медиасервер.
-        </p>
+      <section class="section flow">
+        <p class="eyebrow">Сценарий</p>
+        <h2>От поиска до совместного просмотра — в несколько касаний.</h2>
+        <div class="steps">
+          <div><span>1</span><p>Откройте каталог или начните вводить название.</p></div>
+          <div><span>2</span><p>Выберите результат с доступным источником или карточку для заметок.</p></div>
+          <div><span>3</span><p>Создайте комнату и отправьте ссылку другу.</p></div>
+          <div><span>4</span><p>Смотрите, переписывайтесь и сохраняйте мысли в заметки.</p></div>
+        </div>
+      </section>
+
+      <section id="sources" class="section section--split">
+        <div>
+          <p class="eyebrow">Источники видео</p>
+          <h2>Честный встроенный просмотр без пустого плеера.</h2>
+        </div>
+        <div class="copy">
+          <p>
+            Cinema Notes показывает каталог через TMDB и Shikimori, но не подменяет это нелегальными потоками. Встроенный плеер запускает открытые видео Internet Archive, прямые видеофайлы и личную Jellyfin-медиатеку.
+          </p>
+          <p>
+            Если у тайтла пока нет подключенного источника, приложение открывает карточку и заметки, а не отправляет пользователя в сломанный экран.
+          </p>
+        </div>
+      </section>
+
+      <section id="releases" class="section release-panel">
+        <div>
+          <p class="eyebrow">Релизы и беты</p>
+          <h2>Каждая сборка должна быть видна и проверяема.</h2>
+          <p>
+            Новые версии публикуются через GitHub Releases: стабильные теги вида <code>v1.6.0</code>, тестовые сборки — <code>v1.6.0-beta.1</code>. APK прикладывается к релизу, а изменения фиксируются в changelog.
+          </p>
+        </div>
+        <a class="button button--primary" href="https://github.com/SemGAA/Program_kinp/releases">
+          Открыть релизы
+        </a>
       </section>
     </main>
+
+    <footer class="footer">
+      <span>© 2026 Сёма / SemGAA. Cinema Notes. All rights reserved.</span>
+      <a href="https://github.com/SemGAA/Program_kinp">GitHub</a>
+    </footer>
   </body>
 </html>

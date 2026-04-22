@@ -1,0 +1,26 @@
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+    authors:
+      - dependabot
+  categories:
+    - title: Product
+      labels:
+        - product
+        - enhancement
+    - title: Fixes
+      labels:
+        - bug
+        - fix
+    - title: Android
+      labels:
+        - android
+        - mobile
+    - title: Documentation
+      labels:
+        - documentation
+        - docs
+    - title: Other Changes
+      labels:
+        - "*"
