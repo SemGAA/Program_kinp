@@ -23,3 +23,13 @@ git push origin v1.6.0-beta.1
 ```
 
 The workflow downloads the APK from the `apk-downloads` branch and creates a GitHub Release.
+
+## GitHub Page
+
+The public product page is published from the `gh-pages` branch:
+
+```text
+https://semgaa.github.io/Program_kinp/
+```
+
+When the files in `docs` change, publish the same files to `gh-pages`.
