@@ -8,8 +8,6 @@
 
 Мобильное Android-приложение для совместного просмотра, комнат, профилей друзей и заметок по фильмам, сериалам и аниме.
 
-![Cinema Notes preview](./cinema-app/assets/images/cinema-notes-banner.png)
-
 [Скачать APK](https://raw.githubusercontent.com/SemGAA/Program_kinp/apk-downloads/downloads/cinema-notes-android.apk) · [Релизы](https://github.com/SemGAA/Program_kinp/releases) · [Страница проекта](https://semgaa.github.io/Program_kinp/) · [Портфолио](https://semgaa.github.io/)
 
 ## Идея
@@ -49,8 +47,8 @@ release-notes/       Release texts for GitHub Releases
 - Mobile: Expo `~54.0.33`, React Native `0.81.5`, React `19.1.0`, TypeScript `~5.9.2`.
 - Backend: PHP `^8.2`, Laravel `^12.0`, Sanctum `^4.3`, Reverb `^1.0`, PHPUnit `^11.5`.
 - Data layer: Laravel migrations/models for accounts, rooms, friends, notes, invitations and catalog data.
-- Runtime: Cloudflare Worker is kept as a lightweight edge/API experiment beside the main Laravel backend.
-- Release flow: stable/beta tags, APK artifacts, changelog and GitHub Releases.
+- Runtime: Cloudflare Worker используется как легкий edge/API-эксперимент рядом с основным Laravel backend.
+- Релизный контур: stable/beta tags, APK artifacts, changelog и GitHub Releases.
 
 ## Источники видео и безопасность
 
@@ -77,7 +75,7 @@ Cinema Notes не подключает пиратские балансеры. К
 
 - `cinema-app`: `npm run lint`, `npx tsc --noEmit`.
 - `cinema-backend`: `php artisan test`.
-- Privacy pass: `.env`, build artifacts, временные файлы и личные данные не публикуются.
+- Проверка приватности: `.env`, build artifacts, временные файлы и личные данные не публикуются.
 
 ## Быстрый старт
 
