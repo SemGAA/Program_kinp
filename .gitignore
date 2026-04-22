@@ -2,6 +2,17 @@
 *.log
 .DS_Store
 Thumbs.db
+__pycache__/
+*.pyc
+*.apk
+.playwright-cli/
+render_test/
+render_test2/
+temp_apk/
+tmp_doc_inspect/
+tmp-*.json
+tmp-*.js
+fix_course_docx.py
 
 # App local files
 cinema-app/.expo/
@@ -22,6 +33,9 @@ cinema-backend/storage/framework/sessions/*
 cinema-backend/storage/framework/testing/*
 cinema-backend/storage/framework/views/*
 cinema-backend/bootstrap/cache/*
+
+# Local deploy/debug payloads
+cloudflare-worker/deploy_payload.json
 
 # OS / editors
 .vscode/
