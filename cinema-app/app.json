@@ -51,6 +51,8 @@
     },
     "extra": {
       "apiBaseUrl": "https://cinema-notes-api.semgacinema20260402.workers.dev/api",
+      "allowedProviderHosts": [],
+      "externalStreamEndpoint": "",
       "tmdbApiKey": "c05cabab9351fafd2b28de9c14964ab4",
       "router": {},
       "eas": {

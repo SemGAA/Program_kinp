@@ -27,7 +27,7 @@ import {
   updateNote,
 } from '@/lib/api';
 import { formatRuntime } from '@/lib/format';
-import { resolveAutoVideoSource } from '@/lib/auto-video';
+import { resolveAutoVideoMatch } from '@/lib/auto-video';
 import type { Friend, MediaType, MovieDetails, MovieRecommendation } from '@/types/app';
 
 function readParam(value: string | string[] | undefined) {
@@ -282,14 +282,15 @@ export default function MovieDetailsScreen() {
     try {
       let resolvedVideoUrl = initialVideoUrl;
 
-      const autoResolved = await resolveAutoVideoSource({
+      const autoResolved = await resolveAutoVideoMatch({
         mediaType: movie.mediaType,
         releaseYear: movie.releaseYear,
         title: movie.title,
+        tmdbId: movie.id,
       });
 
-      if (autoResolved) {
-        resolvedVideoUrl = autoResolved;
+      if (autoResolved?.streamUrl) {
+        resolvedVideoUrl = autoResolved.streamUrl;
       }
 
       const room = await createWatchRoom(

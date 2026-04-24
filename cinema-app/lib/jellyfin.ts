@@ -76,7 +76,9 @@ type ResolvePlaybackInput = {
 type SearchMatchInput = {
   mediaType: MediaType;
   releaseYear?: number | null;
+  shikimoriId?: number | null;
   title: string;
+  tmdbId?: number | null;
 };
 
 function storageAvailableOnWeb() {

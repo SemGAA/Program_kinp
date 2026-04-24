@@ -15,7 +15,7 @@ import { AppShell, sharedStyles } from '@/components/app-shell';
 import { AppColors } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { ApiError, createWatchRoom, searchMovies } from '@/lib/api';
-import { resolveAutoVideoSource } from '@/lib/auto-video';
+import { EXTERNAL_STREAM_ENDPOINT, resolveAutoVideoMatch } from '@/lib/auto-video';
 import { resolveJellyfinPlaybackForResult } from '@/lib/jellyfin';
 import type { MovieSearchResult } from '@/types/app';
 
@@ -191,19 +191,29 @@ export default function SearchScreen() {
           ? await resolveJellyfinPlaybackForResult(movie).catch(() => null)
           : null;
 
+      const autoMatch =
+        !movie.videoUrl && !jellyfinPlayback
+          ? await resolveAutoVideoMatch({
+              mediaType: movie.mediaType,
+              releaseYear: movie.releaseYear,
+              shikimoriId: movie.shikimoriId,
+              title: movie.title,
+              tmdbId: movie.sourceKind === 'catalog' ? movie.id : null,
+            })
+          : null;
+
       const resolvedVideoUrl =
         movie.videoUrl ||
         jellyfinPlayback?.streamUrl ||
-        (await resolveAutoVideoSource({
-          mediaType: movie.mediaType,
-          releaseYear: movie.releaseYear,
-          title: movie.title,
-        }));
+        autoMatch?.streamUrl ||
+        null;
 
       if (!resolvedVideoUrl) {
         Alert.alert(
           'Источник не найден',
-          'Карточка найдена, но легальный поток для встроенного просмотра не подключён. Добавьте этот тайтл в свою Jellyfin-медиатеку или выберите результат с пометкой Internet Archive/Jellyfin.',
+          EXTERNAL_STREAM_ENDPOINT
+            ? 'Карточка найдена, но ни Jellyfin, ни настроенный внешний провайдер пока не вернули поток для встроенного просмотра.'
+            : 'Карточка найдена, но легальный поток для встроенного просмотра не подключён. Добавьте этот тайтл в свою Jellyfin-медиатеку или настройте внешний провайдер.',
         );
         handleOpenCard(movie);
         return;
@@ -212,7 +222,7 @@ export default function SearchScreen() {
       const room = await createWatchRoom(
         {
           media_type: movie.mediaType,
-          movie_title: jellyfinPlayback?.title ?? movie.title,
+          movie_title: jellyfinPlayback?.title ?? autoMatch?.title ?? movie.title,
           poster_path: movie.posterPath,
           release_year: movie.releaseYear,
           video_url: resolvedVideoUrl,
@@ -284,7 +294,7 @@ export default function SearchScreen() {
         />
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
         <Text style={sharedStyles.helperText}>
-          Легально встроенно запускаются открытые видео из Internet Archive, прямые видео и ваша медиатека Jellyfin. По TMDB/Shikimori показываются карточки, сезоны и данные, а видео подключается через Jellyfin.
+          Легально встроенно запускаются открытые видео из Internet Archive, прямые видео, ваша медиатека Jellyfin и настроенный внешний провайдер. По TMDB/Shikimori показываются карточки, сезоны и данные, а поток подбирается автоматически.
         </Text>
       </View>
 

@@ -28,7 +28,7 @@ import {
   syncWatchRoomPlayback,
   updateWatchRoomSource,
 } from '@/lib/api';
-import { resolveAutoVideoSource } from '@/lib/auto-video';
+import { EXTERNAL_STREAM_ENDPOINT, resolveAutoVideoMatch } from '@/lib/auto-video';
 import { getStoredJellyfinConnection } from '@/lib/jellyfin';
 import type { Friend, VideoSource, WatchPlayback, WatchRoom, WatchRoomMessage } from '@/types/app';
 
@@ -80,6 +80,8 @@ export default function WatchRoomScreen() {
   const [invitingFriendId, setInvitingFriendId] = useState<number | null>(null);
   const [messageBody, setMessageBody] = useState('');
   const [messageKind, setMessageKind] = useState<'chat' | 'note'>('chat');
+  const hasExternalProvider = Boolean(EXTERNAL_STREAM_ENDPOINT);
+  const canAutoResolveSource = hasJellyfin || hasExternalProvider;
 
   const source: VideoSource = room?.source ?? {
     embedUrl: null,
@@ -228,27 +230,33 @@ export default function WatchRoomScreen() {
       setError(null);
 
       try {
-        const resolvedVideoUrl = await resolveAutoVideoSource({
+        const resolvedMatch = await resolveAutoVideoMatch({
           mediaType: room.mediaType,
           releaseYear: room.releaseYear,
           title: room.movieTitle,
+          tmdbId: room.tmdbId,
         });
 
-        if (!resolvedVideoUrl) {
+        if (!resolvedMatch?.streamUrl) {
           if (manual) {
             Alert.alert(
               'Источник не найден',
-              'Для обычных фильмов, сериалов и аниме нужен легальный поток: например, ваша медиатека Jellyfin. Открытые видео из Internet Archive запускаются сразу.',
+              hasExternalProvider
+                ? 'Jellyfin и настроенный внешний провайдер не нашли поток для этой комнаты.'
+                : 'Для обычных фильмов, сериалов и аниме нужен легальный поток: например, ваша медиатека Jellyfin. Открытые видео из Internet Archive запускаются сразу.',
             );
           }
           return;
         }
 
-        const updatedRoom = await updateWatchRoomSource(room.code, resolvedVideoUrl, token);
+        const updatedRoom = await updateWatchRoomSource(room.code, resolvedMatch.streamUrl, token);
         setRoom(updatedRoom);
 
         if (manual) {
-          Alert.alert('Источник подключён', 'Видео можно смотреть прямо в комнате.');
+          Alert.alert(
+            'Источник подключён',
+            `Видео можно смотреть прямо в комнате. Провайдер: ${resolvedMatch.providerLabel}.`,
+          );
         }
       } catch (caughtError) {
         setError(
@@ -260,7 +268,7 @@ export default function WatchRoomScreen() {
         setIsConnectingSource(false);
       }
     },
-    [room, token],
+    [hasExternalProvider, room, token],
   );
 
   useEffect(() => {
@@ -313,7 +321,7 @@ export default function WatchRoomScreen() {
   }, [applyRemotePlayback, loadFriends, loadRoom]);
 
   useEffect(() => {
-    if (!room || !room.isHost || room.hasVideoSource || !hasJellyfin) {
+    if (!room || !room.isHost || room.hasVideoSource || !canAutoResolveSource) {
       return;
     }
 
@@ -323,7 +331,7 @@ export default function WatchRoomScreen() {
 
     autoConnectAttemptRef.current = room.code;
     void handleConnectBuiltInSource(false);
-  }, [handleConnectBuiltInSource, hasJellyfin, room]);
+  }, [canAutoResolveSource, handleConnectBuiltInSource, room]);
 
   const handleDirectPlaybackStatusUpdate = useCallback(
     (status: AVPlaybackStatus) => {
@@ -622,11 +630,11 @@ export default function WatchRoomScreen() {
               {!room.hasVideoSource ? (
                 <View style={styles.sourceHint}>
                   <Text style={styles.sourceHintText}>
-                    Встроенный просмотр работает с открытыми видео и вашей Jellyfin-медиатекой.
+                    Встроенный просмотр работает с открытыми видео, Jellyfin и настроенным внешним провайдером.
                   </Text>
                   <Pressable
                     onPress={() =>
-                      hasJellyfin
+                      canAutoResolveSource
                         ? void handleConnectBuiltInSource(true)
                         : router.push('/media-server')
                     }
@@ -635,7 +643,7 @@ export default function WatchRoomScreen() {
                       <ActivityIndicator color={AppColors.textPrimary} />
                     ) : (
                       <Text style={styles.sourceHintButtonText}>
-                        {hasJellyfin ? 'Найти в Jellyfin' : 'Настроить Jellyfin'}
+                        {canAutoResolveSource ? 'Найти источник' : 'Настроить Jellyfin'}
                       </Text>
                     )}
                   </Pressable>

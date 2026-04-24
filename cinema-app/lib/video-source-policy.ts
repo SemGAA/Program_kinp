@@ -1,3 +1,5 @@
+import { CONFIGURED_ALLOWED_PROVIDER_HOSTS } from '@/lib/stream-provider-config';
+
 const FORBIDDEN_HOST_PARTS = [
   'kodik',
   'videocdn',
@@ -25,6 +27,17 @@ const FORBIDDEN_PATH_PARTS = [
 
 const FORBIDDEN_QUERY_KEYS = ['iframe', 'player', 'balancer', 'bypass', 'referer', 'referrer'];
 
+export const ALLOWED_PROVIDERS = [...CONFIGURED_ALLOWED_PROVIDER_HOSTS];
+
+function hostMatchesProvider(host: string, providerHost: string) {
+  return host === providerHost || host.endsWith(`.${providerHost}`);
+}
+
+export function isAllowedProviderHost(host: string) {
+  const normalizedHost = String(host || '').trim().toLowerCase().replace(/^www\./, '');
+  return ALLOWED_PROVIDERS.some((providerHost) => hostMatchesProvider(normalizedHost, providerHost));
+}
+
 export type VideoSourcePolicyVerdict = {
   allowed: boolean;
   reason: string | null;
@@ -49,6 +62,13 @@ export function inspectPlaybackUrl(value: string): VideoSourcePolicyVerdict {
         allowed: false,
         reason:
           'Источник похож на сторонний видеобалансер. Cinema Notes не подключает такие плееры.',
+      };
+    }
+
+    if (isAllowedProviderHost(host)) {
+      return {
+        allowed: true,
+        reason: null,
       };
     }
 
